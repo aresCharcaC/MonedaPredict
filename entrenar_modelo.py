@@ -20,20 +20,29 @@ import pickle
 sns.set_style("darkgrid")
 plt.rcParams['figure.figsize'] = (15, 8)
 
-def cargar_datos(filename="datos/eurusd_datos.csv"):
-    """Carga los datos desde el CSV"""
+def cargar_datos(filename="datos/eurusd_con_sentimiento.csv"):
+    """Carga los datos desde el CSV (con sentimiento de noticias si está disponible)"""
     
     print("📂 Cargando datos...")
     
-    if not os.path.exists(filename):
-        print(f"❌ Error: No se encuentra el archivo {filename}")
-        print("👉 Primero ejecuta: extraer_datos.py")
-        return None
+    # Intentar cargar datos con sentimiento primero
+    if os.path.exists(filename):
+        df = pd.read_csv(filename)
+        print(f"✅ Datos con sentimiento cargados: {len(df)} registros")
+        print("📰 Incluye análisis de noticias")
+        return df
     
-    df = pd.read_csv(filename)
-    print(f"✅ Datos cargados: {len(df)} registros")
+    # Fallback a datos sin sentimiento
+    filename_simple = "datos/eurusd_datos.csv"
+    if os.path.exists(filename_simple):
+        df = pd.read_csv(filename_simple)
+        print(f"✅ Datos básicos cargados: {len(df)} registros")
+        print("⚠️ Sin análisis de noticias (ejecuta noticias/integrar_modelo.py para agregarlo)")
+        return df
     
-    return df
+    print(f"❌ Error: No se encuentra ningún archivo de datos")
+    print("👉 Primero ejecuta: extraer_datos.py")
+    return None
 
 def crear_features(df):
     """Crea características adicionales para el modelo"""
@@ -82,10 +91,23 @@ def preparar_datos_lstm(df, look_back=60):
     
     print(f"\n📊 Preparando datos para LSTM (look_back={look_back})...")
     
-    # Seleccionar features
+    # Seleccionar features base
     features = ['open', 'high', 'low', 'close', 'tick_volume', 
                 'MA_10', 'MA_30', 'MA_50', 'RSI', 'Volatility', 
                 'HL_Range', 'Price_Change', 'Volume_MA']
+    
+    # Agregar features de sentimiento si están disponibles
+    sentiment_features = ['sent_mean', 'impact_mean', 'sent_balance', 
+                         'sent_ma_24h', 'sent_trend']
+    
+    available_sentiment = [f for f in sentiment_features if f in df.columns]
+    
+    if available_sentiment:
+        features.extend(available_sentiment)
+        print(f"📰 Features de noticias agregadas: {len(available_sentiment)}")
+        print(f"   {', '.join(available_sentiment)}")
+    else:
+        print("⚠️ Sin features de sentimiento (modelo básico)")
     
     data = df[features].values
     
@@ -260,7 +282,10 @@ def main():
     print("\n" + "="*60)
     print("✅ ENTRENAMIENTO COMPLETADO!")
     print("="*60)
-    print("👉 Ahora ejecuta: prediccion_en_vivo.py")
+    print("\n💡 RECOMENDACIONES:")
+    print("   • Para actualizar noticias: python noticias/obtener_noticias.py")
+    print("   • Para predicciones en vivo: python prediccion_en_vivo.py")
+    print("   • Para visualizar resultados: python visualizar_resultados.py")
 
 if __name__ == "__main__":
     main()

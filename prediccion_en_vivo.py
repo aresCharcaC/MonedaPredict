@@ -116,10 +116,31 @@ class PrediccionForex:
     def hacer_prediccion(self, df):
         """Hace la predicción del próximo precio"""
         
-        # Seleccionar features
+        # Features básicas
         features = ['open', 'high', 'low', 'close', 'tick_volume', 
                    'MA_10', 'MA_30', 'MA_50', 'RSI', 'Volatility', 
                    'HL_Range', 'Price_Change', 'Volume_MA']
+        
+        # Agregar features de sentimiento si están disponibles
+        sentiment_features = ['sent_mean', 'impact_mean', 'sent_balance', 
+                             'sent_ma_24h', 'sent_trend']
+        
+        # Verificar qué features necesita el scaler
+        for feat in sentiment_features:
+            if feat in df.columns:
+                features.append(feat)
+        
+        # Si faltan features de sentimiento, rellenar con ceros
+        for feat in sentiment_features:
+            if feat not in df.columns:
+                df[feat] = 0.0
+        
+        # Asegurar que tenemos todas las features necesarias
+        if len(features) < self.scaler.n_features_in_:
+            # Agregar features faltantes como ceros
+            for feat in sentiment_features:
+                if feat not in features:
+                    features.append(feat)
         
         # Tomar los últimos 'look_back' registros
         datos = df[features].tail(self.look_back).values

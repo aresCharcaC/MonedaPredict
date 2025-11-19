@@ -21,7 +21,7 @@ Solo modifica las variables de abajo y guarda el archivo.
 #   "NZDUSD"  → Dólar Neozelandés / Dólar
 #   "EURGBP"  → Euro / Libra
 
-PAR_DIVISAS = "EURAUD"
+PAR_DIVISAS = "USDCAD"
 
 
 # ═══════════════════════════════════════════════════════════════
