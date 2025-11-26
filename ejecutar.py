@@ -75,7 +75,8 @@ def paso_2_descargar_datos():
     
     # Ejecutar script de extracción
     print("\n🔄 Descargando datos...\n")
-    os.system("python extraer_datos.py")
+    import extraer_datos
+    extraer_datos.main()
     
     print("\n✅ Descarga completada!")
     input("\nPresiona ENTER para continuar...")
@@ -93,7 +94,8 @@ def paso_3_entrenar_modelo():
     
     # Ejecutar entrenamiento
     print("\n🔄 Entrenando...\n")
-    os.system("python entrenar_modelo.py")
+    import entrenar_modelo
+    entrenar_modelo.main()
     
     print("\n✅ Entrenamiento completado!")
     input("\nPresiona ENTER para continuar...")
@@ -112,7 +114,8 @@ def paso_4_generar_senales():
     
     # Ejecutar generador de señales
     print("\n🤖 Sistema activado...\n")
-    os.system("python generar_señales_iqoption.py")
+    import generar_señales_iqoption
+    generar_señales_iqoption.main()
 
 def paso_5_ver_resultados():
     """Visualiza los resultados"""
@@ -127,7 +130,8 @@ def paso_5_ver_resultados():
         return
     
     print("🔄 Generando gráficos...\n")
-    os.system("python visualizar_resultados.py")
+    import visualizar_resultados
+    visualizar_resultados.main()
     
     print("\n✅ Resultados generados!")
     input("\nPresiona ENTER para continuar...")
@@ -225,6 +229,3 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n\n🛑 Programa interrumpido por el usuario")
         print("📁 Tus datos están guardados\n")
-    except Exception as e:
-        print(f"\n❌ Error inesperado: {e}")
-        input("\nPresiona ENTER para salir...")

@@ -1,0 +1,58 @@
+
+╔══════════════════════════════════════════════════════════════════╗
+║           REPORTE DE ENTRENAMIENTO - SISTEMA KNN                 ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Fecha: 2025-11-26 15:55:53
+
+CONFIGURACIÓN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• K Vecinos:        50
+• Horizonte:        4 velas
+• Timeframe:        H4
+• Tipo de datos:    ORO
+
+DATOS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Patrones totales:     1726
+• Features utilizadas:  22
+• Patrones COMPRA:      759 (44.0%)
+• Patrones VENTA:       775 (44.9%)
+• Patrones ESPERA:      192 (11.1%)
+
+RENDIMIENTO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Accuracy:             51.00%
+• Predicciones correctas: 102 / 200
+• Ganancia acumulada:   7.051%
+• Retorno medio COMPRA: 0.360%
+• Retorno medio VENTA:  -0.318%
+
+FEATURES UTILIZADAS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   1. open
+   2. high
+   3. low
+   4. close
+   5. tick_volume
+   6. MA_10
+   7. MA_30
+   8. MA_50
+   9. RSI
+  10. Volatility
+  11. HL_Range
+  12. Price_Change
+  13. Volume_MA
+  14. close_oro
+  15. ratio_eur_oro
+  16. ratio_desviacion
+  17. divergencia_retornos
+  18. oro_tendencia
+  19. ratio_volatilidad
+  20. correlacion
+  21. correlacion_ma
+  22. oro_momentum
+
+╔══════════════════════════════════════════════════════════════════╗
+║                     ENTRENAMIENTO EXITOSO                        ║
+╚══════════════════════════════════════════════════════════════════╝

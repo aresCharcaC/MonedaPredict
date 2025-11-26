@@ -20,11 +20,17 @@ noticias/
 pip install vaderSentiment beautifulsoup4 lxml requests
 ```
 
-### Paso 2: Obtener Noticias
+### Paso 2: Obtener Noticias (MÚLTIPLES FUENTES)
 ```bash
 python noticias/obtener_noticias.py
 ```
-- Descarga noticias de Google News RSS (gratis, sin API key)
+**Fuentes integradas:**
+- ✅ **Google News** (noticias generales sobre EUR/USD)
+- ✅ **Investing.com** (análisis financiero especializado)
+- ✅ **FXStreet** (expertos en forex)
+- ✅ **ForexLive** (noticias en tiempo real)
+- 📊 **~60 noticias** de 4 fuentes diferentes
+- 🔄 **Deduplicación automática** de noticias repetidas
 - Guarda en: `datos/noticias_raw.csv`
 
 ### Paso 3: Analizar Sentimiento
@@ -58,15 +64,21 @@ python noticias/integrar_modelo.py
 ## 🔧 Tecnologías
 
 - **VADER Sentiment**: Análisis de sentimiento sin entrenamiento
-- **Google News RSS**: Fuente de noticias gratuita
+- **Múltiples Fuentes RSS**: 
+  - Google News (noticias generales)
+  - Investing.com (análisis financiero)
+  - FXStreet (expertos forex)
+  - ForexLive (tiempo real)
 - **BeautifulSoup**: Parseo de XML/RSS
 - **Pandas**: Procesamiento de datos
+- **Deduplicación**: Elimina noticias repetidas entre fuentes
 
 ## 📈 Para Escalar Después
 
 ### Opción 1: NewsAPI (100 requests/día gratis)
 - Regístrate en: https://newsapi.org/
 - Descomentar método en `obtener_noticias.py`
+- Agrega 20+ noticias adicionales
 
 ### Opción 2: FinBERT (Modelo especializado)
 ```bash
@@ -74,6 +86,12 @@ pip install transformers torch
 ```
 - Mejor precisión en noticias financieras
 - Requiere más recursos computacionales
+
+### Opción 3: Más fuentes RSS especializadas
+- Reuters Forex
+- Bloomberg Markets
+- MarketWatch
+- DailyFX
 
 ## 🎓 Interpretación
 

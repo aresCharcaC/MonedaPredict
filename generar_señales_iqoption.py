@@ -13,14 +13,18 @@ from datetime import datetime
 import time
 import os
 import config  # Importar configuración
+import sistema_knn  # Sistema de recomendación KNN
+
 
 class GeneradorSeñales:
     """Genera señales para copiar manualmente en IQ Option"""
     
-    def __init__(self):
+    def __init__(self, usar_knn=True):
         self.modelo = None
         self.scaler = None
         self.look_back = config.LOOK_BACK
+        self.usar_knn = usar_knn
+        self.sistema_knn = None
         
         # CONFIGURACIÓN desde config.py
         self.take_profit_pips = config.TAKE_PROFIT_PIPS
@@ -40,7 +44,23 @@ class GeneradorSeñales:
         with open('modelos/scaler.pkl', 'rb') as f:
             self.scaler = pickle.load(f)
         
-        print("✅ Modelo cargado!")
+        print("✅ Modelo LSTM cargado!")
+        
+        # Cargar sistema KNN si está disponible
+        if self.usar_knn and os.path.exists('modelos/sistema_knn.pkl'):
+            try:
+                self.sistema_knn = sistema_knn.SistemaRecomendacionKNN()
+                if self.sistema_knn.cargar_modelo('modelos/sistema_knn.pkl'):
+                    print("✅ Sistema KNN cargado!")
+                else:
+                    self.sistema_knn = None
+            except Exception as e:
+                print(f"⚠️ No se pudo cargar KNN: {e}")
+                self.sistema_knn = None
+        else:
+            if self.usar_knn:
+                print("ℹ️ Sistema KNN no disponible (entrénalo con entrenar_knn.py)")
+        
         return True
     
     def conectar_mt5(self):
@@ -100,31 +120,35 @@ class GeneradorSeñales:
     
     def hacer_prediccion(self, df):
         """Predice el precio futuro"""
-        # Features básicas
+        # Features básicas (13)
         features = ['open', 'high', 'low', 'close', 'tick_volume', 
                    'MA_10', 'MA_30', 'MA_50', 'RSI', 'Volatility', 
                    'HL_Range', 'Price_Change', 'Volume_MA']
         
-        # Agregar features de sentimiento si están disponibles en el scaler
-        sentiment_features = ['sent_mean', 'impact_mean', 'sent_balance', 
-                             'sent_ma_24h', 'sent_trend']
+        # Features de ORO (9) - correlación con oro
+        oro_features = ['close_oro', 'ratio_eur_oro', 'ratio_desviacion', 
+                       'divergencia_retornos', 'oro_tendencia', 'ratio_volatilidad',
+                       'correlacion', 'correlacion_ma', 'oro_momentum']
         
-        # Verificar qué features necesita el scaler
-        for feat in sentiment_features:
-            if feat in df.columns:
-                features.append(feat)
-        
-        # Si faltan features de sentimiento, rellenar con ceros
-        for feat in sentiment_features:
+        # Rellenar features de oro con ceros si no están disponibles
+        for feat in oro_features:
             if feat not in df.columns:
                 df[feat] = 0.0
         
-        # Asegurar que tenemos todas las features necesarias
-        if len(features) < self.scaler.n_features_in_:
-            # Agregar features faltantes como ceros
-            for feat in sentiment_features:
-                if feat not in features:
-                    features.append(feat)
+        # Combinar todas las features (13 + 9 = 22)
+        features.extend(oro_features)
+        
+        datos = df[features].tail(self.look_back).values
+        datos_scaled = self.scaler.transform(datos)
+        X = datos_scaled.reshape(1, self.look_back, len(features))
+        
+        prediccion_scaled = self.modelo.predict(X, verbose=0)
+        
+        dummy = np.zeros((1, self.scaler.n_features_in_))
+        dummy[0, 3] = prediccion_scaled[0, 0]
+        precio_predicho = self.scaler.inverse_transform(dummy)[0, 3]
+        
+        return precio_predicho
         
         datos = df[features].tail(self.look_back).values
         datos_scaled = self.scaler.transform(datos)

@@ -1,0 +1,29 @@
+﻿=== VERIFICACIÓN SISTEMA DE NOTICIAS ===
+
+ PASO 1: Obtener Noticias
+   - Google News: 15 noticias
+   - Investing.com: 10 noticias
+   - FXStreet: 15 noticias
+   - ForexLive: 15 noticias
+   - Total: 55 noticias únicas
+   - Archivo: datos/noticias_raw.csv
+
+ PASO 2: Análisis de Sentimiento
+   - VADER Sentiment: Funcional
+   - Positivas: 18 noticias
+   - Neutrales: 24 noticias
+   - Negativas: 13 noticias
+   - Sentimiento promedio: 0.034
+   - Impacto EUR promedio: +0.201 (alcista)
+   - Archivo: datos/noticias_sentimiento.csv
+
+ PASO 3: Integración con Modelo
+   - Datos de precio: 1,936 registros
+   - Features agregadas: 9 (sent_mean, sent_std, impact_mean, etc.)
+   - Correlación sentimiento-precio: 0.0093
+   - Archivo: datos/eurusd_con_sentimiento.csv
+
+ CONCLUSIÓN: Sistema 100% funcional
+   Todas las 4 fuentes de noticias funcionan correctamente
+   El análisis de sentimiento VADER está operativo
+   Las features se integran correctamente al dataset

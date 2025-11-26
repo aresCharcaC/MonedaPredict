@@ -91,6 +91,31 @@ PESO_ORO = 0.7
 
 
 # ═══════════════════════════════════════════════════════════════
+# 🎯 SISTEMA DE RECOMENDACIÓN KNN
+# ═══════════════════════════════════════════════════════════════
+
+# Activar/Desactivar sistema de recomendación KNN
+USAR_KNN = True
+
+# Número de vecinos más cercanos a analizar
+# Valores típicos: 30-100
+# Más vecinos = recomendaciones más estables pero menos específicas
+# Menos vecinos = recomendaciones más específicas pero pueden ser ruidosas
+K_VECINOS = 50
+
+# Horizonte de predicción (cuántas velas hacia adelante)
+# H4: 4 velas = 16 horas
+# H1: 4 velas = 4 horas
+HORIZONTE_KNN = 4
+
+# Peso del sistema KNN vs LSTM (0.0 - 1.0)
+# 1.0 = confiar 100% en KNN
+# 0.6 = confiar 60% en KNN, 40% en LSTM (RECOMENDADO)
+# 0.5 = 50/50 entre ambos
+PESO_KNN = 0.6
+
+
+# ═══════════════════════════════════════════════════════════════
 # 🔧 CONFIGURACIÓN AVANZADA (no tocar si no sabes)
 # ═══════════════════════════════════════════════════════════════
 
@@ -121,6 +146,11 @@ def mostrar_configuracion():
     if USAR_CORRELACION_ORO:
         print(f"   • Ventana correlación: {VENTANA_CORRELACION_ORO} periodos")
         print(f"   • Peso del oro:        {PESO_ORO*100:.0f}%")
+    print(f"🎯 Sistema KNN:           {'ACTIVADO' if USAR_KNN else 'DESACTIVADO'}")
+    if USAR_KNN:
+        print(f"   • K vecinos:           {K_VECINOS}")
+        print(f"   • Horizonte:           {HORIZONTE_KNN} velas")
+        print(f"   • Peso KNN:            {PESO_KNN*100:.0f}%")
     print("═"*70 + "\n")
 
 

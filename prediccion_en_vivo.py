@@ -12,6 +12,7 @@ import pickle
 from datetime import datetime
 import time
 import os
+import sistema_knn  # Sistema de recomendación KNN
 
 # Para alertas de sonido (opcional)
 try:
@@ -24,11 +25,13 @@ except:
 class PrediccionForex:
     """Clase para hacer predicciones en tiempo real"""
     
-    def __init__(self):
+    def __init__(self, usar_knn=True):
         self.modelo = None
         self.scaler = None
         self.look_back = 60
         self.datos_historicos = []
+        self.usar_knn = usar_knn
+        self.sistema_knn = None
         
     def cargar_modelo(self):
         """Carga el modelo entrenado"""
@@ -47,7 +50,24 @@ class PrediccionForex:
         with open('modelos/scaler.pkl', 'rb') as f:
             self.scaler = pickle.load(f)
         
-        print("✅ Modelo cargado exitosamente!")
+        print("✅ Modelo LSTM cargado exitosamente!")
+        
+        # Cargar sistema KNN si está disponible
+        if self.usar_knn and os.path.exists('modelos/sistema_knn.pkl'):
+            try:
+                self.sistema_knn = sistema_knn.SistemaRecomendacionKNN()
+                if self.sistema_knn.cargar_modelo('modelos/sistema_knn.pkl'):
+                    print("✅ Sistema KNN cargado exitosamente!")
+                else:
+                    print("⚠️ No se pudo cargar sistema KNN")
+                    self.sistema_knn = None
+            except Exception as e:
+                print(f"⚠️ Error al cargar KNN: {e}")
+                self.sistema_knn = None
+        else:
+            if self.usar_knn:
+                print("ℹ️ Sistema KNN no disponible (entrénalo con sistema_knn.py)")
+        
         return True
     
     def conectar_mt5(self):
@@ -116,31 +136,42 @@ class PrediccionForex:
     def hacer_prediccion(self, df):
         """Hace la predicción del próximo precio"""
         
-        # Features básicas
+        # Features básicas (13)
         features = ['open', 'high', 'low', 'close', 'tick_volume', 
                    'MA_10', 'MA_30', 'MA_50', 'RSI', 'Volatility', 
                    'HL_Range', 'Price_Change', 'Volume_MA']
         
-        # Agregar features de sentimiento si están disponibles
-        sentiment_features = ['sent_mean', 'impact_mean', 'sent_balance', 
-                             'sent_ma_24h', 'sent_trend']
+        # Features de ORO (9) - correlación con oro
+        oro_features = ['close_oro', 'ratio_eur_oro', 'ratio_desviacion', 
+                       'divergencia_retornos', 'oro_tendencia', 'ratio_volatilidad',
+                       'correlacion', 'correlacion_ma', 'oro_momentum']
         
-        # Verificar qué features necesita el scaler
-        for feat in sentiment_features:
-            if feat in df.columns:
-                features.append(feat)
-        
-        # Si faltan features de sentimiento, rellenar con ceros
-        for feat in sentiment_features:
+        # Rellenar features de oro con ceros si no están disponibles
+        for feat in oro_features:
             if feat not in df.columns:
                 df[feat] = 0.0
         
-        # Asegurar que tenemos todas las features necesarias
-        if len(features) < self.scaler.n_features_in_:
-            # Agregar features faltantes como ceros
-            for feat in sentiment_features:
-                if feat not in features:
-                    features.append(feat)
+        # Combinar todas las features (13 + 9 = 22)
+        features.extend(oro_features)
+        
+        # Tomar los últimos 'look_back' registros
+        datos = df[features].tail(self.look_back).values
+        
+        # Normalizar
+        datos_scaled = self.scaler.transform(datos)
+        
+        # Preparar para predicción
+        X = datos_scaled.reshape(1, self.look_back, len(features))
+        
+        # Predecir
+        prediccion_scaled = self.modelo.predict(X, verbose=0)
+        
+        # Desnormalizar
+        dummy = np.zeros((1, self.scaler.n_features_in_))
+        dummy[0, 3] = prediccion_scaled[0, 0]
+        precio_predicho = self.scaler.inverse_transform(dummy)[0, 3]
+        
+        return precio_predicho
         
         # Tomar los últimos 'look_back' registros
         datos = df[features].tail(self.look_back).values
@@ -161,37 +192,115 @@ class PrediccionForex:
         
         return precio_predicho
     
-    def generar_senal(self, precio_actual, precio_predicho, umbral=0.0001):
+    def obtener_recomendacion_knn(self, df):
         """
-        Genera señal de trading
+        Obtiene recomendación del sistema KNN basado en patrones similares.
+        
+        Retorna:
+        --------
+        dict o None : Recomendación KNN si está disponible
+        """
+        if self.sistema_knn is None:
+            return None
+        
+        try:
+            recomendacion = self.sistema_knn.obtener_recomendacion(
+                df, 
+                explicar=False  # No mostrar patrones en tiempo real para ser más rápido
+            )
+            return recomendacion
+        except Exception as e:
+            print(f"⚠️ Error en KNN: {e}")
+            return None
+    
+    def generar_senal(self, precio_actual, precio_predicho, df=None, umbral=0.0001):
+        """
+        Genera señal de trading combinando LSTM y KNN (si disponible).
         
         umbral: cambio mínimo para generar señal (en pips aprox)
+        df: DataFrame con datos actuales (para KNN)
         """
         
         diferencia = precio_predicho - precio_actual
         porcentaje = (diferencia / precio_actual) * 100
         
-        # Determinar señal
+        # Señal base del LSTM
         if diferencia > umbral:
-            senal = "🟢 COMPRAR"
+            senal_lstm = "COMPRAR"
             emoji = "📈"
         elif diferencia < -umbral:
-            senal = "🔴 VENDER"
+            senal_lstm = "VENDER"
             emoji = "📉"
         else:
-            senal = "⚪ ESPERAR"
+            senal_lstm = "ESPERAR"
             emoji = "➡️"
         
-        # Calcular confianza (simplificado)
-        confianza = min(abs(porcentaje) * 1000, 100)  # Normalizar a 0-100%
+        # Confianza base del LSTM
+        confianza_lstm = min(abs(porcentaje) * 1000, 100)
         
-        return {
+        # Obtener recomendación KNN si está disponible
+        recomendacion_knn = None
+        if df is not None and self.sistema_knn is not None:
+            recomendacion_knn = self.obtener_recomendacion_knn(df)
+        
+        # Combinar señales LSTM + KNN
+        if recomendacion_knn:
+            accion_knn = recomendacion_knn['accion']
+            confianza_knn = recomendacion_knn['confianza']
+            
+            # Si ambos sistemas coinciden, aumentar confianza
+            if senal_lstm == accion_knn:
+                confianza_final = min((confianza_lstm * 0.4 + confianza_knn * 0.6), 100)
+                senal_final = senal_lstm
+                metodo = "LSTM+KNN (Concordancia ✅)"
+            # Si difieren, usar el de mayor confianza
+            elif confianza_knn > confianza_lstm:
+                confianza_final = confianza_knn * 0.8  # Penalizar ligeramente por conflicto
+                senal_final = accion_knn
+                metodo = "KNN (Mayor confianza)"
+                # Actualizar emoji según KNN
+                if accion_knn == "COMPRAR":
+                    emoji = "📈"
+                elif accion_knn == "VENDER":
+                    emoji = "📉"
+                else:
+                    emoji = "➡️"
+            else:
+                confianza_final = confianza_lstm * 0.8
+                senal_final = senal_lstm
+                metodo = "LSTM (Mayor confianza)"
+        else:
+            # Solo LSTM
+            confianza_final = confianza_lstm
+            senal_final = senal_lstm
+            metodo = "LSTM"
+        
+        # Formatear señal con color
+        if senal_final == "COMPRAR":
+            senal = "🟢 COMPRAR"
+        elif senal_final == "VENDER":
+            senal = "🔴 VENDER"
+        else:
+            senal = "⚪ ESPERAR"
+        
+        resultado = {
             'senal': senal,
             'emoji': emoji,
             'diferencia': diferencia,
             'porcentaje': porcentaje,
-            'confianza': confianza
+            'confianza': confianza_final,
+            'metodo': metodo
         }
+        
+        # Agregar info KNN si está disponible
+        if recomendacion_knn:
+            resultado['knn_accion'] = recomendacion_knn['accion']
+            resultado['knn_confianza'] = recomendacion_knn['confianza']
+            resultado['knn_retorno_esperado'] = recomendacion_knn['retorno_esperado']
+            resultado['knn_vecinos_compra'] = recomendacion_knn['vecinos_compra']
+            resultado['knn_vecinos_venta'] = recomendacion_knn['vecinos_venta']
+        
+        return resultado
     
     def alerta_sonido(self, tipo_senal):
         """Emite alerta sonora"""
@@ -264,11 +373,11 @@ class PrediccionForex:
                 # Precio actual
                 precio_actual = df['close'].iloc[-1]
                 
-                # Hacer predicción
+                # Hacer predicción LSTM
                 precio_predicho = self.hacer_prediccion(df)
                 
-                # Generar señal
-                resultado = self.generar_senal(precio_actual, precio_predicho)
+                # Generar señal (combinando LSTM + KNN)
+                resultado = self.generar_senal(precio_actual, precio_predicho, df)
                 
                 # Mostrar resultados
                 print("─" * 80)
@@ -277,6 +386,16 @@ class PrediccionForex:
                 print(f"🔮 Precio Predicho:  {precio_predicho:.5f}")
                 print(f"📊 Diferencia:       {resultado['diferencia']:.5f} ({resultado['porcentaje']:.3f}%)")
                 print(f"🎯 Confianza:        {resultado['confianza']:.1f}%")
+                print(f"⚙️ Método:           {resultado['metodo']}")
+                
+                # Mostrar info KNN si está disponible
+                if 'knn_accion' in resultado:
+                    print(f"\n🔍 Análisis KNN:")
+                    print(f"   Recomendación: {resultado['knn_accion']}")
+                    print(f"   Confianza KNN: {resultado['knn_confianza']:.1f}%")
+                    print(f"   Retorno esperado: {resultado['knn_retorno_esperado']:.3f}%")
+                    print(f"   Vecinos COMPRA: {resultado['knn_vecinos_compra']} | VENTA: {resultado['knn_vecinos_venta']}")
+                
                 print(f"\n{resultado['emoji']} SEÑAL: {resultado['senal']}")
                 print("─" * 80)
                 
