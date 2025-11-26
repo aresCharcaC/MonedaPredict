@@ -21,7 +21,7 @@ Solo modifica las variables de abajo y guarda el archivo.
 #   "NZDUSD"  → Dólar Neozelandés / Dólar
 #   "EURGBP"  → Euro / Libra
 
-PAR_DIVISAS = "USDCAD"
+PAR_DIVISAS = "EURUSD"
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -71,6 +71,26 @@ CANTIDAD_DATOS = 3000
 
 
 # ═══════════════════════════════════════════════════════════════
+# 🥇 CORRELACIÓN CON ORO
+# ═══════════════════════════════════════════════════════════════
+
+# Activar/Desactivar correlación con ORO (XAU/USD)
+USAR_CORRELACION_ORO = True
+
+# Ventana de correlación móvil (periodos)
+# Valores típicos: 50-200
+# Más alto = correlación más suave pero menos reactiva
+# Más bajo = correlación más reactiva pero más volátil
+VENTANA_CORRELACION_ORO = 100
+
+# Peso de la correlación con oro en el modelo (0.0 - 1.0)
+# 1.0 = máxima influencia del oro
+# 0.5 = influencia moderada
+# 0.0 = sin influencia (desactivado)
+PESO_ORO = 0.7
+
+
+# ═══════════════════════════════════════════════════════════════
 # 🔧 CONFIGURACIÓN AVANZADA (no tocar si no sabes)
 # ═══════════════════════════════════════════════════════════════
 
@@ -97,6 +117,10 @@ def mostrar_configuracion():
     print(f"📈 Confianza mínima:      {CONFIANZA_MINIMA}%")
     print(f"🔄 Revisar cada:          {REVISAR_CADA_MINUTOS} minutos")
     print(f"💾 Datos históricos:      {CANTIDAD_DATOS} velas")
+    print(f"🥇 Correlación con ORO:   {'ACTIVADA' if USAR_CORRELACION_ORO else 'DESACTIVADA'}")
+    if USAR_CORRELACION_ORO:
+        print(f"   • Ventana correlación: {VENTANA_CORRELACION_ORO} periodos")
+        print(f"   • Peso del oro:        {PESO_ORO*100:.0f}%")
     print("═"*70 + "\n")
 
 

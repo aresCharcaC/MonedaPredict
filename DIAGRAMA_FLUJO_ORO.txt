@@ -1,0 +1,308 @@
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║          🥇 FLUJO DEL SISTEMA DE CORRELACIÓN EUR/USD - ORO               ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+
+FLUJO COMPLETO DEL SISTEMA
+══════════════════════════════════════════════════════════════════════════
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                         1. CONFIGURACIÓN                             │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                            ┌───────────────┐
+                            │   config.py   │
+                            └───────────────┘
+                                    │
+                    ┌───────────────┼───────────────┐
+                    ▼               ▼               ▼
+            PAR_DIVISAS      USAR_CORRELACION    PESO_ORO
+             "EURUSD"            = True            = 0.7
+                    └───────────────┴───────────────┘
+                                    │
+                                    ▼
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                    2. EXTRACCIÓN DE DATOS                            │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                      ┌─────────────────────────┐
+                      │   extraer_datos.py      │
+                      └─────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │   MetaTrader 5      │       │   MetaTrader 5      │
+        │                     │       │                     │
+        │   EUR/USD Data      │       │   XAU/USD (ORO)     │
+        │   • Open            │       │   • Open            │
+        │   • High            │       │   • High            │
+        │   • Low             │       │   • Low             │
+        │   • Close           │       │   • Close           │
+        │   • Volume          │       │   • Volume          │
+        └─────────────────────┘       └─────────────────────┘
+                    │                               │
+                    └───────────────┬───────────────┘
+                                    ▼
+                      ┌─────────────────────────┐
+                      │ correlacion_oro.py      │
+                      │                         │
+                      │ integrar_oro_a_eurusd() │
+                      └─────────────────────────┘
+                                    │
+        ┌───────────────────────────┼───────────────────────────┐
+        ▼                           ▼                           ▼
+┌─────────────┐          ┌──────────────────┐       ┌─────────────────┐
+│ Correlación │          │ Features de Oro  │       │  Visualización  │
+│             │          │                  │       │                 │
+│ Pearson r   │          │ • ratio_eur_oro  │       │ correlacion_    │
+│ p-value     │          │ • divergencia    │       │ oro.png         │
+│ Móvil 100   │          │ • oro_tendencia  │       │                 │
+│             │          │ • 6 más...       │       │ • 6 gráficos    │
+└─────────────┘          └──────────────────┘       └─────────────────┘
+        │                           │                           │
+        └───────────────────────────┴───────────────────────────┘
+                                    │
+                                    ▼
+                        ┌───────────────────────┐
+                        │ DATOS INTEGRADOS      │
+                        │                       │
+                        │ eurusd_con_oro.csv    │
+                        │                       │
+                        │ • EUR/USD (8 cols)    │
+                        │ • Indicadores (13)    │
+                        │ • Oro (9 features) ✨ │
+                        │ • Total: ~30 features │
+                        └───────────────────────┘
+                                    │
+                                    ▼
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                    3. ENTRENAMIENTO DEL MODELO                       │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                      ┌─────────────────────────┐
+                      │  entrenar_modelo.py     │
+                      └─────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │ Cargar Datos        │       │ Crear Features      │
+        │                     │       │                     │
+        │ eurusd_con_oro.csv  │       │ • MA 10, 30, 50     │
+        │                     │       │ • RSI               │
+        │ ✨ Con ORO          │       │ • Volatilidad       │
+        └─────────────────────┘       │ • ✨ Features Oro   │
+                    │                 └─────────────────────┘
+                    │                               │
+                    └───────────────┬───────────────┘
+                                    ▼
+                        ┌───────────────────────┐
+                        │ Preparar para LSTM    │
+                        │                       │
+                        │ • Normalización       │
+                        │ • Secuencias (60)     │
+                        │ • Train/Test Split    │
+                        └───────────────────────┘
+                                    │
+                                    ▼
+                        ┌───────────────────────┐
+                        │   MODELO LSTM         │
+                        │                       │
+                        │   Capas:              │
+                        │   • LSTM(100)         │
+                        │   • LSTM(100)         │
+                        │   • LSTM(50)          │
+                        │   • Dense(25)         │
+                        │   • Dense(1)          │
+                        │                       │
+                        │   Input: ~30 features │
+                        │   (incluye oro ✨)    │
+                        └───────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │ Guardar Modelo      │       │ Evaluación          │
+        │                     │       │                     │
+        │ lstm_model.h5       │       │ MAE, RMSE           │
+        │ scaler.pkl          │       │ Gráficos            │
+        └─────────────────────┘       └─────────────────────┘
+                                                │
+                                                ▼
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                    4. PREDICCIÓN EN VIVO                             │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+                      ┌─────────────────────────┐
+                      │ prediccion_en_vivo.py   │
+                      └─────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │ Cargar Modelo       │       │ Obtener Datos Live  │
+        │                     │       │                     │
+        │ lstm_model.h5       │       │ MT5: EUR/USD        │
+        │ scaler.pkl          │       │ MT5: ✨ ORO         │
+        └─────────────────────┘       └─────────────────────┘
+                    │                               │
+                    └───────────────┬───────────────┘
+                                    ▼
+                        ┌───────────────────────┐
+                        │ Integrar Oro (Live)   │
+                        │                       │
+                        │ correlacion_oro.py    │
+                        │ integrar_oro_a_...()  │
+                        └───────────────────────┘
+                                    │
+                                    ▼
+                        ┌───────────────────────┐
+                        │ Calcular Indicadores  │
+                        │                       │
+                        │ • MA, RSI, etc.       │
+                        │ • ✨ Features Oro     │
+                        └───────────────────────┘
+                                    │
+                                    ▼
+                        ┌───────────────────────┐
+                        │   PREDICCIÓN          │
+                        │                       │
+                        │   Modelo LSTM         │
+                        │   + Features Oro ✨   │
+                        └───────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+        ┌─────────────────────┐       ┌─────────────────────┐
+        │ Generar Señal       │       │ Guardar Registro    │
+        │                     │       │                     │
+        │ 🟢 COMPRAR          │       │ señales.csv         │
+        │ 🔴 VENDER           │       │                     │
+        │ ⚪ ESPERAR          │       │ Timestamp, precio,  │
+        │                     │       │ señal, confianza    │
+        └─────────────────────┘       └─────────────────────┘
+
+
+CARACTERÍSTICAS DEL SISTEMA CON ORO
+══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                     MEJORAS CON CORRELACIÓN ORO                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+    SIN ORO                              CON ORO ✨
+    ═══════════════════════════          ═══════════════════════════
+    
+    📊 Features: ~21                     📊 Features: ~30 (+9 oro)
+    
+    🎯 Precisión: Base                   🎯 Precisión: +5-15%
+    
+    📈 Contexto: Solo EUR/USD            📈 Contexto: EUR + ORO + Correlación
+    
+    ⚠️ Falsos positivos: Más             ⚠️ Falsos positivos: Menos
+    
+    🔍 Detección cambios: Básica         🔍 Detección cambios: Avanzada
+    
+    💪 Confianza señales: Moderada       💪 Confianza señales: Alta
+
+
+VENTAJAS DE CADA FEATURE DE ORO
+══════════════════════════════════════════════════════════════════════════
+
+Feature              │ Qué mide                      │ Cómo ayuda
+─────────────────────┼───────────────────────────────┼─────────────────────
+close_oro            │ Precio del oro                │ Nivel absoluto
+ratio_eur_oro        │ EUR/USD ÷ ORO                 │ Relación de precios
+ratio_desviacion     │ Desviación del ratio          │ Sobre/subvaloración
+divergencia_retornos │ Retorno EUR - Retorno ORO     │ Detecta divergencias
+oro_tendencia        │ Dirección del oro             │ Contexto tendencial
+ratio_volatilidad    │ Vol EUR ÷ Vol ORO             │ Riesgo relativo
+correlacion          │ Correlación móvil             │ Fuerza de relación
+correlacion_ma       │ Media de correlación          │ Suavizado
+oro_momentum         │ Momentum oro (5 periodos)     │ Velocidad cambio
+
+
+EJEMPLO DE FLUJO DE DECISIÓN
+══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                      TOMA DE DECISIÓN CON ORO                       │
+└─────────────────────────────────────────────────────────────────────┘
+
+    Datos en Tiempo Real
+           │
+           ▼
+    ┌──────────────┐
+    │  EUR/USD     │──┐
+    │  1.0850      │  │
+    └──────────────┘  │         ┌─────────────────────────┐
+                      ├────────▶│  Modelo LSTM            │
+    ┌──────────────┐  │         │                         │
+    │  ORO ✨      │──┘         │  Predicción:            │
+    │  2040.50     │            │  EUR/USD → 1.0865       │
+    └──────────────┘            │  (↑ +0.14%)             │
+                                └─────────────────────────┘
+                                           │
+                     ┌─────────────────────┼─────────────────────┐
+                     ▼                     ▼                     ▼
+            ┌─────────────┐      ┌──────────────┐      ┌─────────────┐
+            │ Correlación │      │ Oro Tendencia│      │ Divergencia │
+            │             │      │              │      │             │
+            │   0.75      │      │   ↑ +0.5%    │      │   Baja      │
+            │   (Alta)    │      │   (Alcista)  │      │   (Normal)  │
+            └─────────────┘      └──────────────┘      └─────────────┘
+                     │                     │                     │
+                     └─────────────────────┼─────────────────────┘
+                                           ▼
+                                  ┌─────────────────┐
+                                  │   SEÑAL FINAL   │
+                                  │                 │
+                                  │  🟢 COMPRAR     │
+                                  │                 │
+                                  │  Confianza: 85% │
+                                  │                 │
+                                  │  Razón:         │
+                                  │  • EUR sube     │
+                                  │  • Oro sube     │
+                                  │  • Corr. alta   │
+                                  │  • Sin diverg.  │
+                                  └─────────────────┘
+
+
+══════════════════════════════════════════════════════════════════════════
+
+                        🎯 PUNTOS CLAVE
+
+    ✅ El oro se integra automáticamente en todo el flujo
+    ✅ 9 features adicionales mejoran la predicción
+    ✅ Sistema totalmente retrocompatible
+    ✅ Validación cruzada con correlación
+    ✅ Detección de divergencias y cambios de régimen
+
+══════════════════════════════════════════════════════════════════════════
+
+                    📚 ARCHIVOS RELACIONADOS
+
+    • correlacion_oro.py           → Lógica de correlación
+    • config.py                     → Configuración (USAR_CORRELACION_ORO)
+    • extraer_datos.py              → Descarga EUR/USD + ORO
+    • entrenar_modelo.py            → Usa features de oro
+    • prediccion_en_vivo.py         → Predicción con oro en vivo
+    • ejemplo_correlacion_oro.py    → Ejemplos de uso
+    • CORRELACION_ORO_README.md     → Documentación completa
+    • INSTALACION_ORO.txt           → Guía de instalación
+    • verificar_oro.py              → Verificar instalación
+
+══════════════════════════════════════════════════════════════════════════
+

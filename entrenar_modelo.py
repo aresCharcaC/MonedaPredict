@@ -15,6 +15,7 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 import os
 import pickle
+import correlacion_oro  # Módulo de correlación con oro
 
 # Configurar estilo de gráficos
 sns.set_style("darkgrid")
@@ -25,19 +26,36 @@ def cargar_datos(filename="datos/eurusd_con_sentimiento.csv"):
     
     print("📂 Cargando datos...")
     
-    # Intentar cargar datos con sentimiento primero
+    # Prioridad 1: Intentar cargar datos con oro y sentimiento
+    filename_oro_sent = "datos/eurusd_con_oro.csv"
+    if os.path.exists(filename_oro_sent):
+        df = pd.read_csv(filename_oro_sent)
+        # Verificar si tiene features de oro
+        if 'close_oro' in df.columns or 'ratio_eur_oro' in df.columns:
+            print(f"✅ Datos con ORO cargados: {len(df)} registros")
+            print("🥇 Incluye correlación con ORO (XAU/USD)")
+            
+            # Verificar si también tiene sentimiento
+            if 'sent_mean' in df.columns:
+                print("📰 También incluye análisis de noticias")
+            
+            return df
+    
+    # Prioridad 2: Intentar cargar datos con sentimiento
     if os.path.exists(filename):
         df = pd.read_csv(filename)
         print(f"✅ Datos con sentimiento cargados: {len(df)} registros")
         print("📰 Incluye análisis de noticias")
+        print("⚠️ Sin datos de ORO (ejecuta extraer_datos.py para agregarlo)")
         return df
     
-    # Fallback a datos sin sentimiento
+    # Prioridad 3: Fallback a datos sin sentimiento
     filename_simple = "datos/eurusd_datos.csv"
     if os.path.exists(filename_simple):
         df = pd.read_csv(filename_simple)
         print(f"✅ Datos básicos cargados: {len(df)} registros")
         print("⚠️ Sin análisis de noticias (ejecuta noticias/integrar_modelo.py para agregarlo)")
+        print("⚠️ Sin correlación con ORO (ejecuta extraer_datos.py para agregarlo)")
         return df
     
     print(f"❌ Error: No se encuentra ningún archivo de datos")
@@ -96,6 +114,17 @@ def preparar_datos_lstm(df, look_back=60):
                 'MA_10', 'MA_30', 'MA_50', 'RSI', 'Volatility', 
                 'HL_Range', 'Price_Change', 'Volume_MA']
     
+    # Agregar features de oro si están disponibles
+    oro_features = correlacion_oro.obtener_features_oro()
+    available_oro = [f for f in oro_features if f in df.columns]
+    
+    if available_oro:
+        features.extend(available_oro)
+        print(f"🥇 Features de ORO agregadas: {len(available_oro)}")
+        print(f"   {', '.join(available_oro)}")
+    else:
+        print("⚠️ Sin features de ORO (modelo sin correlación con oro)")
+    
     # Agregar features de sentimiento si están disponibles
     sentiment_features = ['sent_mean', 'impact_mean', 'sent_balance', 
                          'sent_ma_24h', 'sent_trend']
@@ -109,7 +138,35 @@ def preparar_datos_lstm(df, look_back=60):
     else:
         print("⚠️ Sin features de sentimiento (modelo básico)")
     
-    data = df[features].values
+    print(f"\n📋 Total de features: {len(features)}")
+    
+    # Verificar que las features existen en el DataFrame
+    missing_features = [f for f in features if f not in df.columns]
+    if missing_features:
+        print(f"⚠️ Features faltantes: {missing_features}")
+        print(f"📋 Columnas disponibles en DataFrame: {list(df.columns)}")
+    
+    # Filtrar solo features que existen
+    available_features = [f for f in features if f in df.columns]
+    
+    if len(available_features) == 0:
+        print(f"❌ Error: No hay features disponibles")
+        print(f"   Features esperadas: {features}")
+        print(f"   Columnas en DF: {list(df.columns)}")
+        return None, None, None, None, None
+    
+    print(f"✅ Features disponibles: {len(available_features)}/{len(features)}")
+    
+    # Verificar que hay datos
+    print(f"📊 Registros en DataFrame antes de extraer features: {len(df)}")
+    
+    data = df[available_features].values
+    
+    print(f"📊 Datos extraídos: {data.shape}")
+    
+    if len(data) == 0:
+        print(f"❌ Error: DataFrame vacío después de extraer features")
+        return None, None, None, None, None
     
     # Normalizar datos (importante para redes neuronales)
     scaler = MinMaxScaler(feature_range=(0, 1))
@@ -261,11 +318,28 @@ def main():
     if df is None:
         return
     
+    print(f"\n📊 Datos cargados: {len(df)} registros")
+    print(f"📋 Columnas: {list(df.columns)}")
+    
     # 2. Crear features
     df = crear_features(df)
     
+    print(f"\n📊 Después de crear features: {len(df)} registros")
+    
+    if len(df) < 100:
+        print(f"❌ Error: Muy pocos datos ({len(df)} registros)")
+        print("👉 Se necesitan al menos 100 registros para entrenar")
+        print("💡 Ejecuta: python extraer_datos.py con más CANTIDAD_DATOS")
+        return
+    
     # 3. Preparar datos para LSTM
-    X_train, X_test, y_train, y_test, scaler = preparar_datos_lstm(df, look_back=60)
+    result = preparar_datos_lstm(df, look_back=60)
+    
+    if result[0] is None:
+        print("❌ Error al preparar datos")
+        return
+    
+    X_train, X_test, y_train, y_test, scaler = result
     
     # 4. Crear modelo
     model = crear_modelo_lstm(input_shape=(X_train.shape[1], X_train.shape[2]))
