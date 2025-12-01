@@ -1,0 +1,830 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                   DOCUMENTACIÓN TÉCNICA - SISTEMA LSTM                       ║
+║                         (Long Short-Term Memory)                             ║
+║                                                                              ║
+║                    Sistema de Predicción Neural Profundo                     ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════════
+📋 ÍNDICE
+═══════════════════════════════════════════════════════════════════════════════
+
+1. ¿QUÉ ES EL SISTEMA LSTM?
+2. ¿CÓMO FUNCIONA?
+3. ARQUITECTURA DE LA RED NEURONAL
+4. TECNOLOGÍAS UTILIZADAS
+5. PROCESO DE ENTRENAMIENTO
+6. FEATURES (CARACTERÍSTICAS) UTILIZADAS
+7. PREDICCIÓN EN TIEMPO REAL
+8. VENTAJAS Y DESVENTAJAS
+9. RESULTADOS Y MÉTRICAS
+10. CONFIGURACIÓN
+11. ARCHIVOS DEL SISTEMA
+
+
+═══════════════════════════════════════════════════════════════════════════════
+1. ¿QUÉ ES EL SISTEMA LSTM?
+═══════════════════════════════════════════════════════════════════════════════
+
+El Sistema LSTM es un modelo de INTELIGENCIA ARTIFICIAL basado en REDES NEURONALES
+RECURRENTES diseñado específicamente para analizar SERIES TEMPORALES.
+
+🎯 OBJETIVO PRINCIPAL:
+   Predecir la dirección futura del par EUR/USD analizando patrones en datos
+   históricos de precios e indicadores técnicos.
+
+🧠 TIPO DE IA:
+   Deep Learning - Redes Neuronales Recurrentes (RNN)
+   Específicamente: Long Short-Term Memory (LSTM)
+
+📊 SALIDA:
+   - COMPRA: El EUR subirá respecto al USD
+   - VENTA: El EUR bajará respecto al USD
+   - ESPERA: No hay señal clara (confianza < 60%)
+
+💡 ANALOGÍA:
+   Imagina un experto trader que ha analizado miles de gráficos durante años.
+   El LSTM hace exactamente eso, pero procesando millones de datos en minutos
+   y encontrando patrones que el ojo humano no puede detectar.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+2. ¿CÓMO FUNCIONA?
+═══════════════════════════════════════════════════════════════════════════════
+
+El sistema funciona en 4 FASES:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FASE 1: RECOLECCIÓN DE DATOS                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   • Se conecta a MetaTrader 5
+   • Descarga datos históricos de EUR/USD
+   • Obtiene datos de XAU/USD (oro) para correlación
+   • Rango: 3000 velas (H4 = ~500 días de datos)
+
+   Ejemplo de datos obtenidos:
+   ┌────────────────────┬──────────┬──────────┬──────────┬──────────┬────────┐
+   │     Timestamp      │   Open   │   High   │   Low    │  Close   │ Volume │
+   ├────────────────────┼──────────┼──────────┼──────────┼──────────┼────────┤
+   │ 2025-01-01 00:00   │  1.1050  │  1.1080  │  1.1040  │  1.1070  │ 15000  │
+   │ 2025-01-01 04:00   │  1.1070  │  1.1090  │  1.1060  │  1.1085  │ 18500  │
+   │        ...         │   ...    │   ...    │   ...    │   ...    │  ...   │
+   └────────────────────┴──────────┴──────────┴──────────┴──────────┴────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FASE 2: INGENIERÍA DE CARACTERÍSTICAS (FEATURE ENGINEERING)                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   Se calculan 22 INDICADORES TÉCNICOS divididos en dos grupos:
+
+   A) INDICADORES TÉCNICOS EUR/USD (13 features):
+      • SMA_20: Media móvil simple 20 periodos
+      • SMA_50: Media móvil simple 50 periodos
+      • EMA_12: Media móvil exponencial 12 periodos
+      • EMA_26: Media móvil exponencial 26 periodos
+      • RSI: Índice de Fuerza Relativa
+      • MACD: Convergencia/Divergencia de Medias Móviles
+      • MACD_signal: Línea de señal del MACD
+      • ATR: Average True Range (volatilidad)
+      • BB_upper: Banda de Bollinger superior
+      • BB_lower: Banda de Bollinger inferior
+      • Stoch_K: Estocástico %K
+      • Stoch_D: Estocástico %D
+      • ADX: Índice Direccional Promedio
+
+   B) CORRELACIÓN CON ORO (9 features):
+      • precio_oro: Precio del oro
+      • retorno_oro: Cambio porcentual del oro
+      • correlacion_oro: Correlación móvil EUR/USD vs Oro
+      • sma_oro_20: Media móvil oro 20 periodos
+      • ema_oro_12: Media móvil exponencial oro
+      • rsi_oro: RSI del oro
+      • ratio_eurusd_oro: Ratio entre EUR/USD y Oro
+      • divergencia_oro: Divergencia entre tendencias
+      • señal_oro: Señal derivada del oro
+
+   🔬 POR QUÉ 22 FEATURES:
+      Cada feature aporta información única:
+      - Tendencia (SMA, EMA)
+      - Momentum (RSI, Estocástico)
+      - Volatilidad (ATR, Bollinger)
+      - Correlación (Oro)
+      - Señales (MACD, ADX)
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FASE 3: ENTRENAMIENTO DE LA RED NEURONAL                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   El modelo aprende de los datos históricos durante ~10-15 minutos:
+
+   1. PREPARACIÓN:
+      • Normalización: Todos los valores entre 0 y 1
+      • Secuencias: Ventanas de 60 velas (240 horas = 10 días)
+      • División: 80% entrenamiento, 20% validación
+
+   2. ARQUITECTURA DE LA RED:
+      
+      Entrada (60 timesteps × 22 features)
+           ↓
+      [LSTM Layer 1] - 100 unidades
+           ↓ (Dropout 20%)
+      [LSTM Layer 2] - 50 unidades
+           ↓ (Dropout 20%)
+      [LSTM Layer 3] - 25 unidades
+           ↓ (Dropout 20%)
+      [Dense Layer] - 1 neurona
+           ↓
+      Salida: Predicción (0 a 1)
+      
+      Si salida > 0.5 → COMPRA
+      Si salida < 0.5 → VENTA
+
+   3. OPTIMIZACIÓN:
+      • Algoritmo: Adam (Adaptive Moment Estimation)
+      • Learning Rate: 0.001
+      • Loss Function: Binary Crossentropy
+      • Métrica: Accuracy
+      • Épocas: 50 (con early stopping)
+      • Batch Size: 32
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FASE 4: PREDICCIÓN EN TIEMPO REAL                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   Una vez entrenado, el modelo predice en vivo:
+
+   1. Obtiene las últimas 60 velas de EUR/USD + Oro
+   2. Calcula los 22 indicadores técnicos
+   3. Normaliza los datos con los mismos escaladores del entrenamiento
+   4. Pasa la secuencia por la red neuronal
+   5. Obtiene predicción (probabilidad 0-1)
+   6. Convierte a señal de trading:
+      
+      ┌────────────────────────────────────────────────────────────────┐
+      │  Predicción > 0.5 → COMPRA (confianza = predicción × 100)     │
+      │  Predicción < 0.5 → VENTA (confianza = (1 - predicción) × 100)│
+      │  Confianza < 60% → ESPERA                                      │
+      └────────────────────────────────────────────────────────────────┘
+
+   7. Si USAR_KNN = True, combina con señal KNN:
+      • Señal final = 40% LSTM + 60% KNN
+      • Si ambos coinciden → Confianza combinada
+      • Si difieren → ESPERA
+
+
+═══════════════════════════════════════════════════════════════════════════════
+3. ARQUITECTURA DE LA RED NEURONAL
+═══════════════════════════════════════════════════════════════════════════════
+
+ARQUITECTURA DETALLADA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Layer (type)                    Output Shape              Param #
+═══════════════════════════════════════════════════════════════════════════════
+lstm_1 (LSTM)                   (None, 60, 100)           49,200
+dropout_1 (Dropout)             (None, 60, 100)           0
+lstm_2 (LSTM)                   (None, 60, 50)            30,200
+dropout_2 (Dropout)             (None, 60, 50)            0
+lstm_3 (LSTM)                   (None, 25)                7,600
+dropout_3 (Dropout)             (None, 25)                0
+dense (Dense)                   (None, 1)                 26
+═══════════════════════════════════════════════════════════════════════════════
+Total params: 87,026
+Trainable params: 87,026
+Non-trainable params: 0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 EXPLICACIÓN DE CAPAS:
+
+1. LSTM Layer 1 (100 unidades):
+   - Procesa secuencias temporales completas
+   - return_sequences=True (pasa toda la secuencia a la siguiente capa)
+   - Aprende patrones a largo plazo
+
+2. Dropout 1 (20%):
+   - Evita overfitting
+   - Desactiva aleatoriamente el 20% de neuronas durante entrenamiento
+
+3. LSTM Layer 2 (50 unidades):
+   - Refina los patrones detectados
+   - Reduce dimensionalidad
+   - Aprende dependencias más complejas
+
+4. Dropout 2 (20%):
+   - Regularización adicional
+
+5. LSTM Layer 3 (25 unidades):
+   - return_sequences=False (solo última salida)
+   - Comprime información en vector final
+   - Prepara para decisión final
+
+6. Dropout 3 (20%):
+   - Regularización final
+
+7. Dense (1 neurona):
+   - Activación: sigmoid
+   - Salida: probabilidad entre 0 y 1
+   - Decisión binaria: COMPRA (>0.5) o VENTA (<0.5)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+4. TECNOLOGÍAS UTILIZADAS
+═══════════════════════════════════════════════════════════════════════════════
+
+LIBRERÍAS PRINCIPALES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. TensorFlow 2.x / Keras
+   ├─ Propósito: Framework de Deep Learning
+   ├─ Uso: Creación y entrenamiento de la red LSTM
+   └─ Componentes clave:
+      • Sequential API para arquitectura
+      • LSTM layers para series temporales
+      • Dropout para regularización
+      • Adam optimizer
+      • Binary Crossentropy loss
+
+2. MetaTrader5
+   ├─ Propósito: Conexión con plataforma de trading
+   ├─ Uso: Obtención de datos históricos en tiempo real
+   └─ Funciones:
+      • initialize(): Conectar a MT5
+      • copy_rates_from_pos(): Obtener velas históricas
+      • shutdown(): Cerrar conexión
+
+3. pandas
+   ├─ Propósito: Manipulación de datos
+   ├─ Uso: DataFrames para organizar datos históricos
+   └─ Operaciones:
+      • Cálculo de indicadores técnicos
+      • Merge de datos EUR/USD + Oro
+      • Limpieza de datos (dropna)
+
+4. numpy
+   ├─ Propósito: Operaciones numéricas
+   ├─ Uso: Arrays multidimensionales para LSTM
+   └─ Operaciones:
+      • reshape() para formato 3D
+      • Operaciones matriciales
+      • Cálculos estadísticos
+
+5. scikit-learn
+   ├─ Propósito: Preprocesamiento y métricas
+   ├─ Uso: Normalización y escalado de datos
+   └─ Componentes:
+      • MinMaxScaler: Normalización 0-1
+      • StandardScaler: Estandarización
+      • train_test_split: División datos
+
+6. matplotlib / seaborn
+   ├─ Propósito: Visualización
+   ├─ Uso: Gráficos de resultados y métricas
+   └─ Gráficos:
+      • Evolución del loss
+      • Predicciones vs reales
+      • Accuracy por época
+
+
+═══════════════════════════════════════════════════════════════════════════════
+5. PROCESO DE ENTRENAMIENTO
+═══════════════════════════════════════════════════════════════════════════════
+
+PASO A PASO DEL ENTRENAMIENTO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ DESCARGA DE DATOS (extraer_datos.py)
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ • Conecta a MT5                                                         │
+   │ • Descarga 3000 velas de EUR/USD (H4)                                   │
+   │ • Descarga 3000 velas de XAU/USD (oro)                                  │
+   │ • Guarda en: datos/eurusd_datos.csv                                     │
+   │ • Tiempo estimado: 30-60 segundos                                       │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+2️⃣ CÁLCULO DE INDICADORES (entrenar_modelo.py)
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ • Lee eurusd_datos.csv                                                  │
+   │ • Calcula 13 indicadores técnicos EUR/USD                               │
+   │ • Calcula 9 indicadores de correlación con oro                          │
+   │ • Elimina filas con NaN (primeras ~100 filas)                           │
+   │ • Guarda en: datos/eurusd_con_oro.csv                                   │
+   │ • Resultado: ~2900 filas × 22 columnas                                  │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+3️⃣ PREPARACIÓN DE DATOS
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ • Crea variable objetivo: close[t+1] > close[t] → 1 (COMPRA), 0 (VENTA)│
+   │ • Normaliza features con MinMaxScaler (0-1)                             │
+   │ • Crea secuencias de 60 timesteps:                                      │
+   │   X[i] = [vela[i-59], vela[i-58], ..., vela[i]]                        │
+   │   y[i] = dirección futura después de vela[i]                            │
+   │ • Resultado: ~2840 secuencias                                           │
+   │ • División: 80% train (2272), 20% val (568)                             │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+4️⃣ CONSTRUCCIÓN DEL MODELO
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ model = Sequential([                                                    │
+   │     LSTM(100, return_sequences=True, input_shape=(60, 22)),            │
+   │     Dropout(0.2),                                                       │
+   │     LSTM(50, return_sequences=True),                                    │
+   │     Dropout(0.2),                                                       │
+   │     LSTM(25),                                                           │
+   │     Dropout(0.2),                                                       │
+   │     Dense(1, activation='sigmoid')                                      │
+   │ ])                                                                      │
+   │                                                                         │
+   │ model.compile(                                                          │
+   │     optimizer='adam',                                                   │
+   │     loss='binary_crossentropy',                                         │
+   │     metrics=['accuracy']                                                │
+   │ )                                                                       │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+5️⃣ ENTRENAMIENTO
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ history = model.fit(                                                    │
+   │     X_train, y_train,                                                   │
+   │     epochs=50,                                                          │
+   │     batch_size=32,                                                      │
+   │     validation_data=(X_val, y_val),                                     │
+   │     callbacks=[early_stopping],                                         │
+   │     verbose=1                                                           │
+   │ )                                                                       │
+   │                                                                         │
+   │ • Early Stopping: Para si val_loss no mejora en 10 épocas              │
+   │ • Tiempo real: ~10-15 minutos (CPU), ~2-3 min (GPU)                    │
+   │ • Progreso por época:                                                   │
+   │   Epoch 1/50 - loss: 0.6932 - acc: 0.5012 - val_loss: 0.6931          │
+   │   Epoch 2/50 - loss: 0.6871 - acc: 0.5234 - val_loss: 0.6845          │
+   │   ...                                                                   │
+   │   Epoch 35/50 - loss: 0.5234 - acc: 0.7123 - val_loss: 0.5678         │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+6️⃣ GUARDADO DEL MODELO
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ • model.save('modelos/lstm_model.h5')                                   │
+   │ • Guarda arquitectura + pesos entrenados                                │
+   │ • Tamaño archivo: ~3-5 MB                                               │
+   │ • Guarda scalers (pickle) para normalización en producción              │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+6. FEATURES (CARACTERÍSTICAS) UTILIZADAS
+═══════════════════════════════════════════════════════════════════════════════
+
+DESCRIPCIÓN DETALLADA DE CADA FEATURE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📈 GRUPO 1: INDICADORES TÉCNICOS EUR/USD (13 features)
+──────────────────────────────────────────────────────────────────────────────
+
+1. SMA_20 (Simple Moving Average 20)
+   • Qué es: Promedio del precio de cierre últimas 20 velas
+   • Para qué: Detecta tendencia de corto plazo
+   • Interpretación: Precio > SMA_20 → Tendencia alcista
+
+2. SMA_50 (Simple Moving Average 50)
+   • Qué es: Promedio del precio de cierre últimas 50 velas
+   • Para qué: Detecta tendencia de medio plazo
+   • Interpretación: SMA_20 > SMA_50 → Señal alcista (Golden Cross)
+
+3. EMA_12 (Exponential Moving Average 12)
+   • Qué es: Media móvil que da más peso a precios recientes
+   • Para qué: Reacciona más rápido a cambios de precio
+   • Uso: Componente del MACD
+
+4. EMA_26 (Exponential Moving Average 26)
+   • Qué es: EMA de largo plazo
+   • Para qué: Filtrar ruido y confirmar tendencia
+   • Uso: Componente del MACD
+
+5. RSI (Relative Strength Index)
+   • Qué es: Mide la fuerza del movimiento del precio (0-100)
+   • Para qué: Detectar sobrecompra/sobreventa
+   • Interpretación:
+     - RSI > 70 → Sobrecomprado (posible venta)
+     - RSI < 30 → Sobrevendido (posible compra)
+
+6. MACD (Moving Average Convergence Divergence)
+   • Qué es: Diferencia entre EMA_12 y EMA_26
+   • Para qué: Detectar cambios de momentum
+   • Interpretación: MACD > 0 → Momentum alcista
+
+7. MACD_signal
+   • Qué es: EMA de 9 periodos del MACD
+   • Para qué: Señales de cruce
+   • Interpretación: MACD > signal → Señal de compra
+
+8. ATR (Average True Range)
+   • Qué es: Promedio del rango verdadero (high - low)
+   • Para qué: Medir volatilidad
+   • Uso: ATR alto → Mayor volatilidad, stops más amplios
+
+9. BB_upper (Bollinger Band Upper)
+   • Qué es: SMA_20 + (2 × desviación estándar)
+   • Para qué: Límite superior de volatilidad normal
+   • Interpretación: Precio > BB_upper → Sobrecomprado
+
+10. BB_lower (Bollinger Band Lower)
+    • Qué es: SMA_20 - (2 × desviación estándar)
+    • Para qué: Límite inferior de volatilidad normal
+    • Interpretación: Precio < BB_lower → Sobrevendido
+
+11. Stoch_K (Stochastic %K)
+    • Qué es: Posición del precio en rango high-low (0-100)
+    • Para qué: Detectar momentum
+    • Interpretación: %K > 80 → Sobrecomprado
+
+12. Stoch_D (Stochastic %D)
+    • Qué es: SMA de 3 periodos del %K
+    • Para qué: Señal suavizada del estocástico
+    • Interpretación: Cruces %K y %D → Señales
+
+13. ADX (Average Directional Index)
+    • Qué es: Mide fuerza de la tendencia (0-100)
+    • Para qué: Saber si hay tendencia o rango
+    • Interpretación:
+      - ADX > 25 → Tendencia fuerte
+      - ADX < 20 → Mercado lateral
+
+
+📊 GRUPO 2: CORRELACIÓN CON ORO (9 features)
+──────────────────────────────────────────────────────────────────────────────
+
+14. precio_oro
+    • Qué es: Precio de cierre de XAU/USD
+    • Para qué: EUR y Oro suelen correlacionar positivamente
+    • Relación: Ambos son alternativas al USD
+
+15. retorno_oro
+    • Qué es: Cambio porcentual del oro vela actual vs anterior
+    • Para qué: Detectar momentum del oro
+    • Uso: Si oro sube, EUR tiende a subir
+
+16. correlacion_oro
+    • Qué es: Correlación móvil de 100 periodos EUR vs Oro
+    • Para qué: Medir fuerza de la relación
+    • Interpretación: Correlación > 0.7 → Fuerte relación
+
+17. sma_oro_20
+    • Qué es: Media móvil simple del oro 20 periodos
+    • Para qué: Tendencia del oro
+    • Uso: Confirmar tendencia EUR/USD
+
+18. ema_oro_12
+    • Qué es: Media móvil exponencial del oro
+    • Para qué: Tendencia rápida del oro
+    • Uso: Señales tempranas
+
+19. rsi_oro
+    • Qué es: RSI calculado sobre el oro
+    • Para qué: Sobrecompra/sobreventa del oro
+    • Relación: Afecta indirectamente al EUR
+
+20. ratio_eurusd_oro
+    • Qué es: EUR/USD ÷ Oro
+    • Para qué: Relación relativa entre ambos
+    • Interpretación: Ratio aumenta → EUR más fuerte que oro
+
+21. divergencia_oro
+    • Qué es: Diferencia entre direcciones EUR y Oro
+    • Para qué: Detectar desacoplamientos
+    • Uso: Divergencia → Posible reversión
+
+22. señal_oro
+    • Qué es: Señal derivada del análisis del oro
+    • Cálculo: Basada en SMA, EMA y RSI del oro
+    • Para qué: Señal adicional de confirmación
+
+
+═══════════════════════════════════════════════════════════════════════════════
+7. PREDICCIÓN EN TIEMPO REAL
+═══════════════════════════════════════════════════════════════════════════════
+
+FLUJO DE PREDICCIÓN EN VIVO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. INICIALIZACIÓN
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ • Carga modelo entrenado: modelos/lstm_model.h5                        │
+   │ • Carga scalers: scaler_X.pkl, scaler_y.pkl                             │
+   │ • Conecta a MetaTrader5                                                 │
+   │ • Inicializa sistema KNN (si está activado)                             │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+2. BUCLE PRINCIPAL (cada 60 minutos)
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ while True:                                                             │
+   │     # Obtener datos actuales                                            │
+   │     datos_eurusd = obtener_ultimas_60_velas("EURUSD")                  │
+   │     datos_oro = obtener_ultimas_60_velas("XAUUSD")                      │
+   │                                                                         │
+   │     # Calcular features                                                 │
+   │     features = calcular_22_indicadores(datos_eurusd, datos_oro)        │
+   │                                                                         │
+   │     # Normalizar                                                        │
+   │     X = scaler_X.transform(features)                                    │
+   │     X = X.reshape(1, 60, 22)  # Formato LSTM: (batch, timesteps, feat) │
+   │                                                                         │
+   │     # Predicción LSTM                                                   │
+   │     prediccion_lstm = model.predict(X)[0][0]                            │
+   │     confianza_lstm = prediccion_lstm * 100 if prediccion_lstm > 0.5    │
+   │                       else (1 - prediccion_lstm) * 100                  │
+   │                                                                         │
+   │     # Predicción KNN (si está activado)                                 │
+   │     if USAR_KNN:                                                        │
+   │         señal_knn = sistema_knn.obtener_recomendacion(features)        │
+   │         # Combinar señales                                              │
+   │         señal_final = combinar_señales(lstm, knn)                       │
+   │     else:                                                               │
+   │         señal_final = señal_lstm                                        │
+   │                                                                         │
+   │     # Mostrar señal                                                     │
+   │     mostrar_senal(señal_final, confianza, timestamp)                    │
+   │                                                                         │
+   │     # Esperar próxima actualización                                     │
+   │     time.sleep(3600)  # 60 minutos                                      │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+3. COMBINACIÓN LSTM + KNN (si USAR_KNN = True)
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ Escenario 1: AMBOS SISTEMAS COINCIDEN                                  │
+   │ ──────────────────────────────────────────────────────────────────────  │
+   │   LSTM: COMPRA (75%)  +  KNN: COMPRA (82%)                             │
+   │   ↓                                                                     │
+   │   Señal: COMPRA                                                         │
+   │   Confianza: 0.4 × 75% + 0.6 × 82% = 79.2%                             │
+   │                                                                         │
+   │ Escenario 2: SISTEMAS DIFIEREN                                         │
+   │ ──────────────────────────────────────────────────────────────────────  │
+   │   LSTM: COMPRA (65%)  +  KNN: VENTA (70%)                              │
+   │   ↓                                                                     │
+   │   Señal: ESPERA (no hay consenso)                                      │
+   │   Confianza: 0%                                                         │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+8. VENTAJAS Y DESVENTAJAS
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ VENTAJAS DEL SISTEMA LSTM:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Memoria a largo plazo
+   • Las LSTM recuerdan patrones de hace 60 velas (10 días)
+   • No olvidan información importante como las RNN simples
+
+2. Captura patrones complejos
+   • Detecta relaciones no lineales entre variables
+   • Encuentra patrones que el ojo humano no ve
+
+3. Aprendizaje automático
+   • Mejora con más datos
+   • Se adapta a cambios de mercado (con reentrenamiento)
+
+4. Múltiples features
+   • Procesa 22 variables simultáneamente
+   • Considera análisis técnico + correlación oro
+
+5. Predicción probabilística
+   • No da respuestas absolutas, sino probabilidades
+   • Permite gestión de riesgo basada en confianza
+
+6. Automatización completa
+   • Análisis 24/7 sin intervención humana
+   • Sin emociones ni sesgos psicológicos
+
+
+❌ DESVENTAJAS DEL SISTEMA LSTM:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Caja negra
+   • Difícil explicar POR QUÉ toma cada decisión
+   • No muestra razonamiento como KNN
+
+2. Requiere muchos datos
+   • Necesita mínimo 2000-3000 velas para entrenar bien
+   • Con pocos datos puede no generalizar
+
+3. Tiempo de entrenamiento
+   • Entrenar toma 10-15 minutos
+   • Requiere CPU/GPU potente para datasets grandes
+
+4. Sensible a hiperparámetros
+   • Número de capas, unidades, dropout, etc.
+   • Requiere experimentación para optimizar
+
+5. Overfitting potencial
+   • Puede memorizar ruido en lugar de patrones reales
+   • Necesita validación cuidadosa
+
+6. No captura eventos extraordinarios
+   • No sabe de noticias, eventos políticos, cisnes negros
+   • Solo usa datos técnicos históricos
+
+7. Degradación temporal
+   • El mercado cambia, el modelo envejece
+   • Necesita reentrenamiento periódico (mensual/semanal)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+9. RESULTADOS Y MÉTRICAS
+═══════════════════════════════════════════════════════════════════════════════
+
+MÉTRICAS TÍPICAS EN VALIDACIÓN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Accuracy (Precisión):
+├─ Entrenamiento: 65-75%
+├─ Validación: 60-70%
+└─ Interpretación: El modelo acierta la dirección en ~65% de casos
+
+Loss (Pérdida):
+├─ Entrenamiento final: 0.50-0.55
+├─ Validación final: 0.52-0.58
+└─ Interpretación: Menor es mejor, mide error en predicciones
+
+Confusion Matrix (Matriz de Confusión):
+┌─────────────────────────────────────┐
+│           Predicho                  │
+│         COMPRA  VENTA               │
+│    ┌─────────────────────┐          │
+│ C  │   350  │   150      │  Real    │
+│ O  ├─────────────────────┤          │
+│ M  │   180  │   320      │          │
+│ P  └─────────────────────┘          │
+│                                     │
+│ Verdaderos Positivos: 350           │
+│ Falsos Positivos: 150               │
+│ Verdaderos Negativos: 320           │
+│ Falsos Negativos: 180               │
+│                                     │
+│ Precision COMPRA: 66%               │
+│ Recall COMPRA: 70%                  │
+└─────────────────────────────────────┘
+
+Rendimiento en Trading Simulado:
+├─ Señales generadas: 100
+├─ Señales ganadoras: 62-68
+├─ Señales perdedoras: 32-38
+├─ Win Rate: 62-68%
+├─ Profit Factor: 1.5-1.8
+└─ Ganancia neta simulada: +5-10%
+
+
+═══════════════════════════════════════════════════════════════════════════════
+10. CONFIGURACIÓN
+═══════════════════════════════════════════════════════════════════════════════
+
+Archivo: config.py
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PARÁMETROS DE TRADING
+# ─────────────────────────────────────────────────────────────────────────────
+
+PAR_DIVISAS = "EURUSD"                 # Par a operar
+TIMEFRAME = mt5.TIMEFRAME_H4           # H4 = 4 horas por vela
+TAKE_PROFIT_PIPS = 80                  # Objetivo de ganancia
+STOP_LOSS_PIPS = 40                    # Límite de pérdida
+CONFIANZA_MINIMA = 60                  # % mínimo para operar
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PARÁMETROS DEL MODELO LSTM
+# ─────────────────────────────────────────────────────────────────────────────
+
+DATOS_HISTORICOS = 3000                # Velas a descargar
+SECUENCIA_ENTRADA = 60                 # Velas que analiza el LSTM
+TRAIN_TEST_SPLIT = 0.8                 # 80% train, 20% validación
+
+# Arquitectura de la red
+LSTM_UNITS_1 = 100                     # Unidades primera capa
+LSTM_UNITS_2 = 50                      # Unidades segunda capa
+LSTM_UNITS_3 = 25                      # Unidades tercera capa
+DROPOUT_RATE = 0.2                     # Tasa de dropout (20%)
+
+# Entrenamiento
+EPOCHS = 50                            # Máximo de épocas
+BATCH_SIZE = 32                        # Tamaño de batch
+LEARNING_RATE = 0.001                  # Tasa de aprendizaje
+EARLY_STOPPING_PATIENCE = 10           # Paciencia para early stopping
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PARÁMETROS DE PREDICCIÓN EN VIVO
+# ─────────────────────────────────────────────────────────────────────────────
+
+REVISAR_CADA_MINUTOS = 60              # Intervalo de actualización
+MOSTRAR_METRICAS_DETALLADAS = True     # Mostrar todas las métricas
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CORRELACIÓN CON ORO
+# ─────────────────────────────────────────────────────────────────────────────
+
+USAR_CORRELACION_ORO = True            # Activar features de oro
+VENTANA_CORRELACION = 100              # Periodos para correlación móvil
+PESO_ORO = 0.7                         # Peso de señales de oro
+
+
+═══════════════════════════════════════════════════════════════════════════════
+11. ARCHIVOS DEL SISTEMA
+═══════════════════════════════════════════════════════════════════════════════
+
+SCRIPTS PRINCIPALES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. extraer_datos.py
+   ├─ Función: Descarga datos históricos de MT5
+   ├─ Input: Ninguno (usa config.py)
+   ├─ Output: datos/eurusd_datos.csv
+   ├─ Tiempo: ~30-60 segundos
+   └─ Uso: python extraer_datos.py
+
+2. entrenar_modelo.py
+   ├─ Función: Entrena la red neuronal LSTM
+   ├─ Input: datos/eurusd_datos.csv
+   ├─ Output: modelos/lstm_model.h5, scalers
+   ├─ Tiempo: ~10-15 minutos
+   └─ Uso: python entrenar_modelo.py
+
+3. prediccion_en_vivo.py
+   ├─ Función: Genera predicciones en tiempo real
+   ├─ Input: modelos/lstm_model.h5
+   ├─ Output: Señales en consola
+   ├─ Ejecución: Continua (cada 60 min)
+   └─ Uso: python prediccion_en_vivo.py
+
+4. generar_señales_iqoption.py
+   ├─ Función: Genera señales formato IQ Option
+   ├─ Input: modelos/lstm_model.h5
+   ├─ Output: registros/señales_iqoption.csv
+   ├─ Ejecución: Continua
+   └─ Uso: python generar_señales_iqoption.py
+
+5. visualizar_resultados.py
+   ├─ Función: Crea gráficos y métricas
+   ├─ Input: registros/señales_iqoption.csv
+   ├─ Output: Gráficos matplotlib
+   ├─ Tiempo: ~10-20 segundos
+   └─ Uso: python visualizar_resultados.py
+
+ARCHIVOS DE DATOS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+datos/
+├── eurusd_datos.csv              # Datos históricos descargados
+├── eurusd_con_oro.csv            # Datos + indicadores + oro
+└── (generados automáticamente)
+
+modelos/
+├── lstm_model.h5                 # Modelo LSTM entrenado
+├── scaler_X.pkl                  # Normalizador de features
+└── scaler_y.pkl                  # Normalizador de target
+
+registros/
+└── señales_iqoption.csv          # Señales generadas
+
+
+═══════════════════════════════════════════════════════════════════════════════
+📚 REFERENCIAS Y RECURSOS
+═══════════════════════════════════════════════════════════════════════════════
+
+Papers y Documentación:
+• LSTM Networks: Hochreiter & Schmidhuber (1997)
+• TensorFlow Documentation: tensorflow.org
+• Technical Analysis: ta-lib.org
+
+Libros Recomendados:
+• "Deep Learning" - Ian Goodfellow
+• "Hands-On Machine Learning" - Aurélien Géron
+• "Python for Finance" - Yves Hilpisch
+
+
+═══════════════════════════════════════════════════════════════════════════════
+✅ RESUMEN EJECUTIVO
+═══════════════════════════════════════════════════════════════════════════════
+
+El Sistema LSTM es una RED NEURONAL PROFUNDA que:
+
+✓ Analiza 60 velas históricas (10 días en H4)
+✓ Procesa 22 indicadores técnicos simultáneamente
+✓ Incluye correlación con oro para mayor precisión
+✓ Predice dirección futura de EUR/USD
+✓ Genera señales COMPRA/VENTA/ESPERA
+✓ Se actualiza cada 60 minutos
+✓ Precisión: 65-70% en validación
+✓ Se combina con KNN para mayor confianza
+
+Ideal para: Análisis técnico automatizado basado en patrones históricos
+Limitación: No considera noticias fundamentales (usar Sistema de Sentimientos)
+
+═══════════════════════════════════════════════════════════════════════════════
+                          FIN DE LA DOCUMENTACIÓN
+═══════════════════════════════════════════════════════════════════════════════

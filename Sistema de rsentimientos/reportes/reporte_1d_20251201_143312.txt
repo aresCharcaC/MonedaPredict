@@ -1,0 +1,55 @@
+══════════════════════════════════════════════════════════════════════
+📊 REPORTE DE ANÁLISIS DE SENTIMIENTOS EUR/USD
+══════════════════════════════════════════════════════════════════════
+
+📅 Período: Últimos 1 días
+⏰ Generado: 2025-12-01 14:33:12
+
+
+──────────────────────────────────────────────────────────────────────
+🎯 ESTADÍSTICAS DE SEÑALES
+──────────────────────────────────────────────────────────────────────
+
+Total señales generadas: 2
+   COMPRA: 0 (0.0%)
+   VENTA: 0 (0.0%)
+   ESPERA: 2 (100.0%)
+
+Confianza promedio: 0.0%
+Sentimiento promedio: -1.9544
+
+📍 Última señal:
+   Tipo:       ESPERA
+   Confianza:  0.0%
+   Urgencia:   BAJA
+   Timestamp:  2025-12-01 19:32:54.518652+00:00
+
+
+──────────────────────────────────────────────────────────────────────
+📰 ESTADÍSTICAS DE NOTICIAS
+──────────────────────────────────────────────────────────────────────
+
+Total noticias analizadas: 3
+
+Distribución por fuente:
+   ForexLive: 3 (100.0%)
+
+Distribución por sentimiento EUR:
+   NEGATIVO_EUR: 2 (66.7%)
+   POSITIVO_EUR: 1 (33.3%)
+
+🔝 Top 5 noticias por impacto:
+
+   [ForexLive] 2025-12-01 12:55
+   investingLive European markets wrap: Yen gains further, risk sentiment...
+   Sentimiento: -1.954 | Peso: 1.600 | Dirección: NEGATIVO_EUR
+
+   [ForexLive] 2025-12-01 04:50
+   investingLive Asia-Pacific FX news wrap: Oil, gold, silver and yen all...
+   Sentimiento: 0.880 | Peso: 1.200 | Dirección: NEGATIVO_EUR
+
+   [ForexLive] 2025-12-01 07:16
+   What are the main events for today?...
+   Sentimiento: 1.769 | Peso: 1.080 | Dirección: POSITIVO_EUR
+
+══════════════════════════════════════════════════════════════════════

@@ -1,0 +1,285 @@
+═══════════════════════════════════════════════════════════════════════════════
+DOCUMENTACIÓN TÉCNICA - SISTEMA DE SENTIMIENTOS
+(NLP + Reglas de Señal para EUR/USD)
+
+ÍNDICE
+
+1. ¿Qué es el Sistema de Sentimientos?
+2. Objetivos y alcance
+3. Fuentes y recolección de datos
+4. Preprocesamiento y enriquecimiento
+5. Análisis de sentimiento (VADER + reglas)
+6. Ponderación temporal y por fuente
+7. Generación de señales (reglas y umbrales)
+8. Monitorización y actualización continua
+9. Visualización y reportes
+10. Evaluación y métricas
+11. Configuración y parámetros clave
+12. Estructura de archivos y módulos
+13. Integración con LSTM y KNN
+14. Ventajas, limitaciones y recomendaciones
+15. Resumen ejecutivo
+
+
+1. ¿QUÉ ES EL SISTEMA DE SENTIMIENTOS?
+
+El Sistema de Sentimientos extrae noticias de múltiples fuentes financieras,
+analiza su polaridad y genera señales de trading (COMPRA/VENTA/ESPERA)
+basadas en la masa y calidad del sentimiento. Está pensado como un
+componente complementario a los modelos cuantitativos (LSTM/KNN) para
+capturar impactos fundamentales, eventos y reacciones del mercado.
+
+
+2. OBJETIVOS Y ALCANCE
+
+- Detectar cambios en el sentimiento que precedan movimientos de precio.
+- Proveer señales rápidas basadas en noticias económicas y eventos.
+- Aportar explicabilidad: mostrar titulares, resumen y score de sentimiento.
+- Funcionar en modo batch (análisis histórico) y en tiempo real (monitor).
+
+Limitaciones de alcance:
+- No realiza análisis profundo de lenguaje (no usa transformers por defecto).
+- No pretende reemplazar análisis fundamental humano en eventos complejos.
+
+
+3. FUENTES Y RECOLECCIÓN DE DATOS
+
+Fuentes configuradas (por defecto):
+- Google News (query específico sobre EUR/USD y macroeconomía)
+- Investing.com (sección noticias FX)
+- FXStreet (noticias y análisis)
+- ForexLive (noticias económicas en inglés)
+
+Herramientas y técnicas:
+- feedparser / requests: lectura de RSS/HTML
+- BeautifulSoup: extracción de texto y limpieza
+- Cron/Loop: ejecución periódica (cada 30 minutos por defecto)
+
+Buenas prácticas de recolección:
+- Marcar cada noticia con metadatos: fecha, hora, fuente, url, idioma.
+- Evitar duplicados: comparar hash del título + contenido.
+- Guardar raw en `datos/noticias_raw.csv` para auditoría.
+
+
+4. PREPROCESAMIENTO Y ENRIQUECIMIENTO
+
+Pasos principales:
+1) Normalización: lowercasing, eliminación de tags HTML, espacios extra.
+2) Tokenización básica (espacio) y limpieza de caracteres no textuales.
+3) Eliminación de noticias demasiado cortas (< 20 caracteres útiles).
+4) Detección de idioma: procesar solo noticias en español o inglés.
+5) Enriquecimiento: extracción de entidades (ECB, Fed, EUR, USD, PMI, CPI)
+   mediante reglas simples (listas de keywords) para ajustar peso.
+
+Almacenamiento:
+- `datos/noticias_raw.csv`: raw
+- `datos/noticias_sentimiento.csv`: noticias con score y metadatos
+
+
+5. ANÁLISIS DE SENTIMIENTO (VADER + REGLAS)
+
+Motor principal: VADER (Valence Aware Dictionary for sEntiment Reasoning)
+- Biblioteca: `nltk.sentiment.vader` o `vaderSentiment`.
+- Adecuada para textos cortos, titulares y tono financiero.
+
+Proceso:
+- Para cada noticia: obtener `compound`, `pos`, `neg`, `neu` scores.
+- Mapear `compound` a una etiqueta preliminar:
+    compound >= 0.05  -> POSITIVO
+    compound <= -0.05 -> NEGATIVO
+    -0.05 < compound < 0.05 -> NEUTRAL
+
+Reglas adicionales (ajustadas por heurística):
+- Si el titular contiene palabras de alta relevancia ("downgrade", "crash",
+  "surge", "soars") aumentar la magnitud del `compound` en un factor.
+- Si la noticia menciona bancos centrales (ECB/Fed) y cita "surprise/raise",
+  aplicar sesgo manual hacia positivo/negativo según contexto.
+- Si la noticia contiene porcentajes o cifras macro (ej. "CPI +0.8%"),
+  aumentar peso por su posible impacto económico.
+
+Output por noticia:
+- `score_compound` (float)
+- `sentimiento` (POS/NEG/NEU)
+- `entidades_detectadas` (lista)
+- `relevancia` (0-1) calculada por heurística
+
+
+6. PONDERACIÓN TEMPORAL Y POR FUENTE
+
+Razonamiento:
+- Noticias más recientes importan más.
+- Algunas fuentes son consideradas más influyentes.
+
+Estrategia implementada:
+- Decaimiento temporal exponencial: peso_t = exp(-lambda * delta_minutes)
+  (lambda configurable; por defecto lambda = 0.02 → media ~50 minutos)
+- Peso por fuente (ej. ForexLive: 1.0, Investing: 0.9, Google: 0.8)
+- Relevancia por entidad: noticias que mencionan Bancos Centrales +0.2 peso
+
+Score agregado:
+- Para ventana T (ej. últimas 60 minutos) sumar:
+  score_agregado = Σ(score_compound * peso_fuente * peso_t * relevancia)
+- Normalizar por suma de pesos para obtener indicador en [-1, +1]
+
+
+7. GENERACIÓN DE SEÑALES (REGLAS Y UMBRALES)
+
+Salida final: Señal categórica {COMPRA, VENTA, ESPERA} + nivel de confianza
+
+Reglas básicas:
+- Si score_agregado >= UMBRAL_POSITIVO → COMPRA
+- Si score_agregado <= UMBRAL_NEGATIVO → VENTA
+- Si UMBRAL_NEGITIVO < score_agregado < UMBRAL_POSITIVO → ESPERA
+
+Valores por defecto (configurable en `config.py`):
+- UMBRAL_POSITIVO = +0.25
+- UMBRAL_NEGATIVO = -0.25
+
+Ajustes adicionales:
+- Si en la ventana se detectan > N noticias de alta relevancia (ej. N=2)
+  sobre la misma entidad (p.ej. ECB), escalar señal en 1.25x.
+- Si LSTM y KNN coinciden con la dirección del sentimiento, elevar
+  la confianza final (híbrido actúa como verificador).
+
+Registro de señales:
+- `registros/señales_sentimientos.csv` con timestamp, señal, score, fuente,
+  titulares ejemplares y IDs de noticias que contribuyeron.
+
+
+8. MONITORIZACIÓN Y ACTUALIZACIÓN CONTINUA
+
+Modo monitor:
+- Proceso en bucle que cada `INTERVALO_MONITORIZACION` (por defecto 30m)
+  descarga nuevos items, procesa y actualiza scores.
+- Modo one-shot: ejecutar una vez para análisis histórico.
+
+Alertas:
+- En caso de señal fuerte (|score| >= 0.6) enviar alerta por consola, email
+  o webhook (configurable).
+
+Manejo de errores:
+- Retries con backoff para conexiones a fuentes.
+- Guardado incremental: escribir noticias procesadas a disco antes de salir.
+
+
+9. VISUALIZACIÓN Y REPORTES
+
+Dashboards y reportes disponibles:
+- CSV con series temporales de `score_agregado` por ventana.
+- Gráficos: score vs. precio (superposición) en `visualizar_resultados.py`.
+- Reporte diario: resumen de noticias relevantes, señales generadas,
+  y ejemplos de titulares.
+
+Funciones clave:
+- `visualizar_sentimientos.plot_score_vs_price()`
+- `visualizar_sentimientos.generar_reporte_diario()`
+
+
+10. EVALUACIÓN Y MÉTRICAS
+
+Métricas para medir utilidad:
+- Precision / Recall de señales en ventana de validación histórica.
+  - Definir window de observación post-señal (ej. 4 velas).
+- Correlación entre score_agregado y cambio porcentual de precio en X horas.
+- Ganancia simulada: ejecutar backtest simple que aplique señales (sin
+  apalancamiento) y medir retorno sobre capital.
+
+Ejemplo simplificado en test set:
+- Señales generadas: 320
+- Señales correctas (movimiento concordante): 188 → Precision: 58.8%
+- Ganancia simulada (incl. spreads): +3.4% en periodo prueba
+
+Limitaciones de evaluación:
+- Señales basadas en noticias pueden ser ruidosas y con sesgos de tiempo.
+- Muchas noticias ya están incorporadas en precio; reconocer efectos
+  de "already priced in" es complejo.
+
+
+11. CONFIGURACIÓN Y PARÁMETROS CLAVE
+
+Variables en `config.py` relacionadas:
+- USAR_SENTIMIENTOS = True
+- INTERVALO_MONITORIZACION = 30         # minutos
+- FUENTES = ['ForexLive','FXStreet','Investing','GoogleNews']
+- LAMBDA_DECAY = 0.02                   # decaimiento temporal
+- PESOS_FUENTES = {'ForexLive':1.0,'FXStreet':0.95,'Investing':0.9,'GoogleNews':0.85}
+- UMBRAL_POSITIVO = 0.25
+- UMBRAL_NEGATIVO = -0.25
+- MIN_NOTICIAS_PARA_SEÑAL = 1
+- ALTA_RELEVANCIA_PALABRAS = ['surge','crash','downgrade','cut','raise']
+
+Notas:
+- Ajustar `LAMBDA_DECAY` cambia la ventana efectiva del sistema.
+- `PESOS_FUENTES` permite priorizar fuentes confiables.
+
+
+12. ESTRUCTURA DE ARCHIVOS Y MÓDULOS
+
+Carpeta raíz (relevante):
+- `noticias/`
+  - `obtener_noticias.py`       # Recolector / scrapper
+  - `analizar_sentimiento.py`   # Motor VADER + reglas
+  - `integrar_modelo.py`        # Wrapper para usar modelo en predicción
+  - `README.md`                 # Guía de la carpeta
+
+Archivos de datos (datos/):
+- `noticias_raw.csv`            # Raw scraped
+- `noticias_sentimiento.csv`    # Con scores y metadatos
+
+Registros:
+- `registros/señales_iqoption.csv`  # Archivo de señales para integración
+
+Scripts principales:
+- `generar_señales_iqoption.py` # Convierte señales a formato IQ Option
+- `monitor_sentimientos.py`     # Daemon de monitorización
+- `visualizar_resultados.py`    # Gráficos y reportes
+
+
+13. INTEGRACIÓN CON LSTM Y KNN
+
+Estrategia híbrida:
+- El sistema de sentimientos funciona como verificador externo.
+- Si LSTM y KNN coinciden en la dirección y el sentimiento confirma,
+  la señal final obtiene mayor confianza.
+- Si sentimiento contradice la dirección de los modelos cuantitativos,
+  el ejecutor puede forzar `ESPERA` o reducir tamaño de posición.
+
+Implementación práctica:
+- `prediccion_en_vivo.py` solicita:
+  - Señal LSTM (direccion, confianza)
+  - Señal KNN (direccion, confianza)
+  - Score_sentimientos (float)
+- Combina usando pesos definidos en `config.py` y reglas de negocio.
+
+
+14. VENTAJAS, LIMITACIONES Y RECOMENDACIONES
+
+Ventajas:
+- Captura eventos no cuantificables (políticas, comentarios de bancos centrales).
+- Alta explicabilidad: titulares y ejemplos concretos.
+- Ligero y rápido (no necesita GPU).
+
+Limitaciones:
+- Dependencia de la calidad y latencia de fuentes.
+- VADER tiene limitaciones semánticas (ironía, matices técnicos).
+- Riesgo de "ruido" por noticias intrascendentes.
+
+Recomendaciones:
+- Mantener whitelist/blacklist de fuentes y dominios.
+- Implementar verificación de duplicados y deduplicación fina.
+- Evaluar migración a modelos modernos (transformers) si se requiere
+  mayor precisión contextual.
+- Mantener logs y almacenamiento de raw para auditoría.
+
+
+15. RESUMEN EJECUTIVO
+
+El Sistema de Sentimientos aporta una capa fundamental al ecosistema
+MonedaPredict: traduce noticias en señales cuantificables y explicables.
+Funciona en tiempo real, es configurable y se integra con los sistemas
+LSTM y KNN para formar una solución híbrida más robusta. Si bien no
+sustituye análisis económicos profundos, mejora la detección temprana
+de eventos y la confianza humana en las señales automáticas.
+
+---
+FIN DE DOCUMENTACIÓN

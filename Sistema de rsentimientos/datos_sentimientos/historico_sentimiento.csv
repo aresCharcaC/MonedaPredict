@@ -1,0 +1,3 @@
+timestamp,señal,confianza,urgencia,total_noticias,sentimiento_general,balance_eur,señal_corto_plazo,confianza_corto_plazo,noticias_corto_plazo,señal_medio_plazo,confianza_medio_plazo,noticias_medio_plazo,señal_largo_plazo,confianza_largo_plazo,noticias_largo_plazo
+2025-12-01 19:32:40.678950+00:00,ESPERA,0,BAJA,3,-1.9544,-1.0,ESPERA,0,0,ESPERA,0,1,ESPERA,0,3
+2025-12-01 19:32:54.518652+00:00,ESPERA,0,BAJA,3,-1.9544,-1.0,ESPERA,0,0,ESPERA,0,1,ESPERA,0,3

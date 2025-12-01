@@ -1,0 +1,890 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                    DOCUMENTACIÓN TÉCNICA - SISTEMA KNN                       ║
+║                      (K-Nearest Neighbors Recommendation)                    ║
+║                                                                              ║
+║                Sistema de Recomendación por Similitud de Patrones            ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════════
+📋 ÍNDICE
+═══════════════════════════════════════════════════════════════════════════════
+
+1. ¿QUÉ ES EL SISTEMA KNN?
+2. ¿CÓMO FUNCIONA?
+3. ANALOGÍA CON RECOMENDACIONES DE LIBROS
+4. TECNOLOGÍAS UTILIZADAS
+5. PROCESO DE ENTRENAMIENTO
+6. PREDICCIÓN Y VOTACIÓN
+7. VENTAJAS Y DESVENTAJAS
+8. RESULTADOS Y MÉTRICAS
+9. CONFIGURACIÓN
+10. ARCHIVOS DEL SISTEMA
+11. COMPARACIÓN CON LSTM
+
+
+═══════════════════════════════════════════════════════════════════════════════
+1. ¿QUÉ ES EL SISTEMA KNN?
+═══════════════════════════════════════════════════════════════════════════════
+
+El Sistema KNN es un ALGORITMO DE RECOMENDACIÓN basado en Machine Learning
+que predice el futuro del EUR/USD buscando PATRONES SIMILARES en el pasado.
+
+🎯 OBJETIVO PRINCIPAL:
+   Cuando el mercado presenta cierta situación, buscar las 50 veces más parecidas
+   en la historia y ver qué pasó después. Si en 35 de esas 50 veces el precio
+   SUBIÓ, entonces recomienda COMPRA.
+
+🧠 TIPO DE IA:
+   Machine Learning - Aprendizaje Supervisado
+   Algoritmo: K-Nearest Neighbors (K vecinos más cercanos)
+
+📊 SALIDA:
+   - COMPRA: La mayoría de patrones similares resultaron en subida
+   - VENTA: La mayoría de patrones similares resultaron en bajada
+   - ESPERA: No hay consenso claro entre vecinos
+
+💡 ANALOGÍA SIMPLE:
+   Imagina que Netflix te recomienda una película. ¿Cómo lo hace?
+   
+   1. Busca usuarios con gustos similares a los tuyos (vecinos cercanos)
+   2. Ve qué películas les gustaron a esos usuarios
+   3. Te las recomienda
+   
+   KNN hace lo mismo pero con patrones de trading:
+   
+   1. Busca situaciones de mercado similares a la actual
+   2. Ve qué pasó después en esos casos históricos
+   3. Recomienda la acción que tuvo más éxito
+
+
+═══════════════════════════════════════════════════════════════════════════════
+2. ¿CÓMO FUNCIONA?
+═══════════════════════════════════════════════════════════════════════════════
+
+El sistema funciona en 3 FASES:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FASE 1: CONSTRUCCIÓN DE LA BASE DE CONOCIMIENTO                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   Durante el entrenamiento, el sistema crea una BIBLIOTECA de patrones:
+
+   1. Toma datos históricos (3000 velas de EUR/USD + Oro)
+   
+   2. Calcula 22 indicadores técnicos para cada vela
+   
+   3. Para cada vela, mira 4 velas hacia adelante (horizonte = 4)
+   
+   4. Clasifica el resultado en 3 categorías:
+      • COMPRA: El precio subió significativamente
+      • VENTA: El precio bajó significativamente
+      • ESPERA: El precio se movió poco
+   
+   5. Guarda cada patrón con su resultado:
+      
+      Patrón #1: [RSI=45, MACD=0.02, SMA_20=1.105, ...] → COMPRA
+      Patrón #2: [RSI=72, MACD=-0.01, SMA_20=1.108, ...] → VENTA
+      Patrón #3: [RSI=55, MACD=0.00, SMA_20=1.106, ...] → ESPERA
+      ...
+      Patrón #1726: [RSI=38, MACD=0.03, SMA_20=1.110, ...] → COMPRA
+
+   Resultado: 1,726 patrones históricos etiquetados
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FASE 2: CÁLCULO DE SIMILITUDES (DISTANCIA EUCLIDIANA)                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   Cuando llega una NUEVA situación de mercado, el sistema:
+
+   1. Calcula los 22 indicadores técnicos actuales:
+      Situación_actual = [RSI=48, MACD=0.01, SMA_20=1.107, ...]
+
+   2. Compara con TODOS los 1,726 patrones históricos usando la fórmula:
+      
+      Distancia = √[(RSI_actual - RSI_histórico)² + 
+                    (MACD_actual - MACD_histórico)² + 
+                    ... (para las 22 features)]
+
+   3. Ejemplo de cálculo:
+      
+      Situación actual: [RSI=48, MACD=0.01, SMA_20=1.107]
+      
+      Patrón #523: [RSI=50, MACD=0.02, SMA_20=1.106]
+      Distancia = √[(48-50)² + (0.01-0.02)² + (1.107-1.106)²] = 2.24
+      
+      Patrón #891: [RSI=47, MACD=0.01, SMA_20=1.107]
+      Distancia = √[(48-47)² + (0.01-0.01)² + (1.107-1.107)²] = 1.00
+      
+      Patrón #234: [RSI=70, MACD=-0.05, SMA_20=1.095]
+      Distancia = √[(48-70)² + (0.01-(-0.05))² + (1.107-1.095)²] = 22.18
+
+   4. Ordena por distancia (menor = más similar):
+      
+      Ranking de similitud:
+      1º Patrón #891 → Distancia: 1.00 → Resultado histórico: COMPRA
+      2º Patrón #523 → Distancia: 2.24 → Resultado histórico: COMPRA
+      3º Patrón #1205 → Distancia: 2.89 → Resultado histórico: VENTA
+      ...
+      50º Patrón #678 → Distancia: 8.45 → Resultado histórico: COMPRA
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  FASE 3: VOTACIÓN DEMOCRÁTICA                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+   Con los 50 patrones más similares (K=50), se realiza una VOTACIÓN:
+
+   1. Cuenta cuántos de cada tipo:
+      • 28 patrones → COMPRA
+      • 15 patrones → VENTA
+      • 7 patrones → ESPERA
+
+   2. Calcula porcentajes:
+      • COMPRA: 28/50 = 56%
+      • VENTA: 15/50 = 30%
+      • ESPERA: 7/50 = 14%
+
+   3. Determina ganador:
+      COMPRA tiene la mayoría → Recomienda COMPRA con 56% confianza
+
+   4. Aplica umbral de confianza:
+      • Si confianza ≥ 60% → Genera señal
+      • Si confianza < 60% → ESPERA (no hay consenso claro)
+
+   En este ejemplo: 56% < 60% → Señal final: ESPERA
+
+
+═══════════════════════════════════════════════════════════════════════════════
+3. ANALOGÍA CON RECOMENDACIONES DE LIBROS/NETFLIX
+═══════════════════════════════════════════════════════════════════════════════
+
+🎬 NETFLIX / AMAZON (Filtrado Colaborativo)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CÓMO FUNCIONA NETFLIX:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  TÚ has visto:                        Usuario A (similar a ti):            │
+│  ✓ Inception ⭐⭐⭐⭐⭐              ✓ Inception ⭐⭐⭐⭐⭐                │
+│  ✓ Matrix ⭐⭐⭐⭐⭐                 ✓ Matrix ⭐⭐⭐⭐⭐                   │
+│  ✓ Interstellar ⭐⭐⭐⭐⭐           ✓ Interstellar ⭐⭐⭐⭐⭐             │
+│  ? Tenet                              ✓ Tenet ⭐⭐⭐⭐⭐                 │
+│                                                                             │
+│  Usuario B (similar a ti):            Usuario C (similar a ti):            │
+│  ✓ Inception ⭐⭐⭐⭐                ✓ Inception ⭐⭐⭐⭐                  │
+│  ✓ Matrix ⭐⭐⭐⭐⭐                 ✓ Matrix ⭐⭐⭐⭐                    │
+│  ✓ Interstellar ⭐⭐⭐⭐             ✓ Interstellar ⭐⭐⭐⭐⭐             │
+│  ✓ Tenet ⭐⭐⭐⭐⭐                  ✓ Tenet ⭐⭐⭐                       │
+│                                                                             │
+│  RESULTADO: 3 de 3 usuarios similares amaron Tenet                         │
+│  → Netflix te recomienda Tenet con 83% match                               │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+EQUIVALENCIA EN TRADING:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  SITUACIÓN ACTUAL:                     Patrón Histórico A (similar):       │
+│  RSI: 48                                RSI: 50                             │
+│  MACD: 0.01                             MACD: 0.02                          │
+│  SMA_20: 1.107                          SMA_20: 1.106                       │
+│  ? Resultado desconocido                ✓ Resultado: COMPRA ⬆              │
+│                                                                             │
+│  Patrón Histórico B (similar):         Patrón Histórico C (similar):       │
+│  RSI: 47                                RSI: 49                             │
+│  MACD: 0.01                             MACD: 0.00                          │
+│  SMA_20: 1.107                          SMA_20: 1.108                       │
+│  ✓ Resultado: COMPRA ⬆                 ✓ Resultado: COMPRA ⬆             │
+│                                                                             │
+│  RESULTADO: 3 de 3 patrones similares resultaron en COMPRA                 │
+│  → KNN recomienda COMPRA con 100% confianza                                │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+📚 AMAZON LIBROS (Sistema más clásico)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PROBLEMA: "Inflación de calificaciones"
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Usuario 1: Califica TODO con ⭐⭐⭐⭐⭐ (generoso)                         │
+│  Usuario 2: Califica TODO con ⭐⭐⭐ (promedio)                             │
+│  Usuario 3: Califica TODO con ⭐⭐⭐⭐ (positivo)                           │
+│                                                                             │
+│  Problema: Un ⭐⭐⭐⭐⭐ del Usuario 1 = ⭐⭐⭐ del Usuario 2               │
+│  Solución: Normalizar calificaciones por usuario                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+¿TENEMOS ESTE PROBLEMA EN TRADING?
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ❌ NO, porque en trading NO hay "calificaciones subjetivas"               │
+│                                                                             │
+│  En lugar de estrellas, tenemos RESULTADOS OBJETIVOS:                      │
+│  • Precio subió → COMPRA (binario, no hay opinión)                         │
+│  • Precio bajó → VENTA (binario, no hay opinión)                           │
+│  • Precio lateral → ESPERA (binario, no hay opinión)                       │
+│                                                                             │
+│  Un patrón que resultó en COMPRA siempre es COMPRA                         │
+│  No depende de quién lo califique                                          │
+│                                                                             │
+│  Por eso KNN funciona MUY BIEN en trading:                                 │
+│  ✓ Clasificación binaria objetiva                                          │
+│  ✓ No hay sesgos de usuario                                                │
+│  ✓ Los datos históricos son hechos, no opiniones                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+4. TECNOLOGÍAS UTILIZADAS
+═══════════════════════════════════════════════════════════════════════════════
+
+LIBRERÍAS PRINCIPALES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. scikit-learn (sklearn)
+   ├─ Propósito: Framework de Machine Learning
+   ├─ Uso: Implementación del algoritmo KNN
+   └─ Componentes clave:
+      • NearestNeighbors: Búsqueda de vecinos cercanos
+      • StandardScaler: Normalización de features
+      • Mode (scipy.stats): Votación por mayoría
+
+2. pandas
+   ├─ Propósito: Manipulación de datos
+   ├─ Uso: DataFrames para datos históricos
+   └─ Operaciones:
+      • Lectura de CSV
+      • Cálculo de etiquetas (COMPRA/VENTA/ESPERA)
+      • Merge con datos de oro
+
+3. numpy
+   ├─ Propósito: Operaciones numéricas
+   ├─ Uso: Arrays y cálculos matemáticos
+   └─ Operaciones:
+      • Distancias euclidianas
+      • reshape() para formato correcto
+      • Operaciones vectorizadas
+
+4. pickle
+   ├─ Propósito: Serialización
+   ├─ Uso: Guardar modelo entrenado
+   └─ Archivos:
+      • sistema_knn.pkl (modelo completo)
+      • Rápida carga en producción
+
+
+ALGORITMO: NearestNeighbors de sklearn
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Configuración:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ from sklearn.neighbors import NearestNeighbors                             │
+│                                                                             │
+│ modelo = NearestNeighbors(                                                  │
+│     n_neighbors=50,           # Buscar 50 vecinos más cercanos             │
+│     algorithm='auto',         # Elige automáticamente (ball_tree/kd_tree)  │
+│     metric='euclidean',       # Distancia euclidiana                       │
+│     n_jobs=-1                 # Usar todos los cores CPU                   │
+│ )                                                                           │
+│                                                                             │
+│ modelo.fit(X_historico)       # Aprende de 1,726 patrones                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Por qué Distancia Euclidiana:
+• Es la distancia "en línea recta" en espacio multidimensional
+• Funciona bien cuando todas las features están normalizadas
+• Interpretación geométrica clara
+• Rápida de calcular
+
+
+═══════════════════════════════════════════════════════════════════════════════
+5. PROCESO DE ENTRENAMIENTO
+═══════════════════════════════════════════════════════════════════════════════
+
+PASO A PASO DEL ENTRENAMIENTO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ CARGA DE DATOS
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ • Lee eurusd_con_oro.csv (datos históricos con indicadores)            │
+   │ • Verifica que tenga las 22 columnas de features                        │
+   │ • Si faltan, calcula indicadores técnicos                               │
+   │ • Total: ~2900 filas (velas históricas)                                 │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+2️⃣ CREACIÓN DE ETIQUETAS (Labels)
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ Para cada vela[i], mira HORIZONTE_KNN velas adelante (default: 4):     │
+   │                                                                         │
+   │ precio_actual = close[i]                                                │
+   │ precio_futuro = close[i + 4]                                            │
+   │ cambio = (precio_futuro - precio_actual) / precio_actual                │
+   │                                                                         │
+   │ if cambio > 0.0005:    # Subió más de 0.05%                            │
+   │     label = "COMPRA"                                                    │
+   │ elif cambio < -0.0005: # Bajó más de 0.05%                             │
+   │     label = "VENTA"                                                     │
+   │ else:                  # Movimiento lateral                             │
+   │     label = "ESPERA"                                                    │
+   │                                                                         │
+   │ Ejemplo concreto:                                                       │
+   │ Vela 100: close = 1.1050                                                │
+   │ Vela 104: close = 1.1062                                                │
+   │ Cambio: (1.1062 - 1.1050) / 1.1050 = 0.0011 = 0.11%                    │
+   │ → Etiqueta: COMPRA (subió más de 0.05%)                                │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+3️⃣ DISTRIBUCIÓN DE ETIQUETAS
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ Resultado típico en 1,726 patrones:                                     │
+   │                                                                         │
+   │   COMPRA: 759 patrones (44.0%)  ████████████████                        │
+   │   VENTA: 775 patrones (44.9%)   ████████████████                        │
+   │   ESPERA: 192 patrones (11.1%)  ████                                    │
+   │                                                                         │
+   │ Observación: Balance casi perfecto entre COMPRA y VENTA                │
+   │ → El mercado sube y baja casi la misma cantidad de veces                │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+4️⃣ NORMALIZACIÓN
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ Problema: Las features tienen escalas MUY diferentes:                   │
+   │   • RSI: rango 0-100                                                    │
+   │   • MACD: rango -0.05 a +0.05                                           │
+   │   • SMA_20: rango 1.10 a 1.15                                           │
+   │                                                                         │
+   │ Si no normalizamos:                                                     │
+   │   Distancia euclidiana daría mucho más peso a SMA_20                    │
+   │   (porque sus valores son ~100x más grandes que MACD)                   │
+   │                                                                         │
+   │ Solución: StandardScaler                                                │
+   │   • Cada feature → media = 0, desviación estándar = 1                   │
+   │   • X_normalizado = (X - media) / desviación                            │
+   │                                                                         │
+   │ Ahora TODAS las features tienen la misma importancia en distancias     │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+5️⃣ ENTRENAMIENTO DEL MODELO
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ from sklearn.neighbors import NearestNeighbors                         │
+   │                                                                         │
+   │ # Crear modelo                                                          │
+   │ knn = NearestNeighbors(n_neighbors=50, metric='euclidean')             │
+   │                                                                         │
+   │ # "Entrenar" (en realidad, solo guarda los datos)                      │
+   │ knn.fit(X_normalizado)                                                  │
+   │                                                                         │
+   │ # ¡Listo! No hay iteraciones ni epochs                                 │
+   │ # KNN es "lazy learning": no aprende hasta que predice                 │
+   │                                                                         │
+   │ Tiempo: < 1 segundo (solo indexa los datos)                            │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+6️⃣ EVALUACIÓN EN TEST SET
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ • Separa últimas 200 velas para testing                                │
+   │ • Para cada vela de test:                                               │
+   │   1. Busca sus 50 vecinos más cercanos                                  │
+   │   2. Vota por mayoría                                                   │
+   │   3. Compara predicción vs etiqueta real                                │
+   │                                                                         │
+   │ • Calcula métricas:                                                     │
+   │   - Accuracy: 102/200 = 51%                                             │
+   │   - Ganancia simulada: +7.051%                                          │
+   │                                                                         │
+   │ • Genera reporte detallado                                              │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+7️⃣ GUARDADO DEL SISTEMA
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ import pickle                                                           │
+   │                                                                         │
+   │ # Guardar TODO el sistema (modelo + scaler + labels)                   │
+   │ with open('modelos/sistema_knn.pkl', 'wb') as f:                        │
+   │     pickle.dump(sistema_knn, f)                                         │
+   │                                                                         │
+   │ Archivo incluye:                                                        │
+   │ • Modelo NearestNeighbors con 1,726 patrones                            │
+   │ • StandardScaler entrenado                                              │
+   │ • Etiquetas de cada patrón                                              │
+   │ • Configuración (k_vecinos, horizonte, etc.)                            │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+6. PREDICCIÓN Y VOTACIÓN
+═══════════════════════════════════════════════════════════════════════════════
+
+PROCESO DE PREDICCIÓN EN TIEMPO REAL:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ OBTENER SITUACIÓN ACTUAL
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ • Obtiene última vela de EUR/USD + Oro                                  │
+   │ • Calcula 22 indicadores técnicos                                       │
+   │ • Normaliza con el mismo StandardScaler del entrenamiento               │
+   │                                                                         │
+   │ Ejemplo:                                                                │
+   │ situacion_actual = [                                                    │
+   │     RSI: 48,                                                            │
+   │     MACD: 0.01,                                                         │
+   │     SMA_20: 1.107,                                                      │
+   │     ... (22 features en total)                                          │
+   │ ]                                                                       │
+   │                                                                         │
+   │ situacion_normalizada = scaler.transform(situacion_actual)              │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+2️⃣ BUSCAR VECINOS MÁS CERCANOS
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ distancias, indices = knn.kneighbors(situacion_normalizada)            │
+   │                                                                         │
+   │ Resultado:                                                              │
+   │ indices = [891, 523, 1205, 678, ..., 234]  # 50 índices                │
+   │ distancias = [1.00, 2.24, 2.89, ..., 8.45] # 50 distancias             │
+   │                                                                         │
+   │ Interpretación:                                                         │
+   │ • Patrón #891 es el MÁS similar (distancia 1.00)                       │
+   │ • Patrón #234 es el menos similar de los 50 (distancia 8.45)           │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+3️⃣ OBTENER ETIQUETAS DE LOS VECINOS
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ vecinos_labels = []                                                     │
+   │ for idx in indices:                                                     │
+   │     vecinos_labels.append(etiquetas[idx])                               │
+   │                                                                         │
+   │ Resultado (50 etiquetas):                                               │
+   │ ['COMPRA', 'COMPRA', 'VENTA', 'COMPRA', 'ESPERA', 'COMPRA', ...]       │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+4️⃣ VOTACIÓN POR MAYORÍA
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ from scipy.stats import mode                                            │
+   │                                                                         │
+   │ # Contar votos                                                          │
+   │ votos_compra = vecinos_labels.count('COMPRA')   # 28                   │
+   │ votos_venta = vecinos_labels.count('VENTA')     # 15                   │
+   │ votos_espera = vecinos_labels.count('ESPERA')   # 7                    │
+   │                                                                         │
+   │ # Determinar ganador                                                    │
+   │ ganador = mode(vecinos_labels)[0]  # 'COMPRA'                          │
+   │                                                                         │
+   │ # Calcular confianza                                                    │
+   │ confianza = (28 / 50) * 100 = 56%                                       │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+5️⃣ APLICAR UMBRAL DE CONFIANZA
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ UMBRAL_MINIMO = 60%  # Configurado en config.py                        │
+   │                                                                         │
+   │ if confianza >= UMBRAL_MINIMO:                                          │
+   │     señal = ganador      # 'COMPRA', 'VENTA' o 'ESPERA'                │
+   │ else:                                                                   │
+   │     señal = 'ESPERA'     # No hay consenso claro                       │
+   │                                                                         │
+   │ En el ejemplo: 56% < 60% → Señal: ESPERA                               │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+6️⃣ MOSTRAR PATRONES SIMILARES (EXPLICABILIDAD)
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ Top 5 patrones más similares:                                           │
+   │                                                                         │
+   │ 1. Patrón #891 (distancia: 1.00)                                        │
+   │    Fecha: 2024-11-15 12:00                                              │
+   │    RSI: 47, MACD: 0.01, SMA_20: 1.107                                   │
+   │    Resultado histórico: COMPRA → Precio subió 0.12%                     │
+   │                                                                         │
+   │ 2. Patrón #523 (distancia: 2.24)                                        │
+   │    Fecha: 2024-10-03 08:00                                              │
+   │    RSI: 50, MACD: 0.02, SMA_20: 1.106                                   │
+   │    Resultado histórico: COMPRA → Precio subió 0.08%                     │
+   │                                                                         │
+   │ 3. Patrón #1205 (distancia: 2.89)                                       │
+   │    Fecha: 2024-09-20 16:00                                              │
+   │    RSI: 51, MACD: 0.00, SMA_20: 1.108                                   │
+   │    Resultado histórico: VENTA → Precio bajó 0.06%                       │
+   │                                                                         │
+   │ ... (muestra 5 de 50)                                                   │
+   │                                                                         │
+   │ ✓ Ventaja: El trader puede VER por qué se recomienda cada acción       │
+   └─────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+7. VENTAJAS Y DESVENTAJAS
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ VENTAJAS DEL SISTEMA KNN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. EXPLICABILIDAD (Mayor ventaja)
+   • Puedes VER exactamente qué patrones similares encontró
+   • Puedes VERIFICAR manualmente si tiene sentido
+   • Genera CONFIANZA en el trader
+
+2. No requiere entrenamiento largo
+   • Entrenamiento: < 1 segundo
+   • No hay epochs, no hay iteraciones
+   • Rápido de actualizar con nuevos datos
+
+3. Simple de entender
+   • Concepto intuitivo: "situaciones parecidas tendrán resultados parecidos"
+   • No es caja negra como redes neuronales
+   • Fácil de explicar a no técnicos
+
+4. Funciona bien con pocos datos
+   • No necesita millones de datos como deep learning
+   • 1,500-2,000 patrones son suficientes
+
+5. No asume distribución de datos
+   • No asume que los datos sean lineales o normales
+   • Funciona con cualquier distribución
+
+6. Robusto a outliers (si K es grande)
+   • Un patrón anómalo entre 50 no afecta mucho
+   • La votación suaviza el ruido
+
+7. Actualización incremental fácil
+   • Solo agregar nuevos patrones a la base
+   • No necesita reentrenar todo desde cero
+
+
+❌ DESVENTAJAS DEL SISTEMA KNN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Lento en predicción (con muchos datos)
+   • Debe calcular distancia con TODOS los patrones históricos
+   • Con 100,000 patrones sería muy lento
+   • Solución: Usar estructuras optimizadas (KD-Tree, Ball-Tree)
+
+2. Sensible a la normalización
+   • REQUIERE normalizar features
+   • Si una feature tiene escala muy grande, dominará las distancias
+
+3. Maldición de la dimensionalidad
+   • Con MUCHAS features (>50), las distancias pierden significado
+   • Todos los puntos parecen "equidistantes"
+   • 22 features está bien, 100+ sería problemático
+
+4. No aprende patrones complejos
+   • Solo busca similitud directa
+   • No encuentra relaciones no lineales complejas como LSTM
+
+5. Requiere guardar todos los datos
+   • Modelo grande en memoria
+   • LSTM solo guarda pesos, KNN guarda todos los patrones
+
+6. Sensible al valor de K
+   • K muy pequeño (5) → Sensible a ruido
+   • K muy grande (200) → Promedia demasiado, pierde señal
+   • Requiere experimentación
+
+7. No generaliza más allá de lo visto
+   • Si el mercado entra en situación totalmente nueva (cisne negro)
+   • KNN no sabe qué hacer, solo busca lo "menos diferente"
+
+
+═══════════════════════════════════════════════════════════════════════════════
+8. RESULTADOS Y MÉTRICAS
+═══════════════════════════════════════════════════════════════════════════════
+
+MÉTRICAS EN TEST SET (200 VELAS):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Accuracy Global:
+├─ Predicciones correctas: 102 / 200
+├─ Accuracy: 51.00%
+└─ Interpretación: Ligeramente mejor que azar (50%)
+
+Distribución de Predicciones:
+├─ COMPRA predichas: 88
+├─ VENTA predichas: 90
+└─ ESPERA predichas: 22
+
+Distribución Real:
+├─ COMPRA reales: 88
+├─ VENTA reales: 90
+└─ ESPERA reales: 22
+
+Matriz de Confusión:
+┌─────────────────────────────────────────────────────────────────┐
+│                    Predicho                                     │
+│              COMPRA    VENTA    ESPERA                          │
+│         ┌──────────────────────────────┐                        │
+│  COMPRA │    45    │   35   │    8    │  Real                  │
+│  VENTA  │    30    │   50   │   10    │                        │
+│  ESPERA │     13   │    5   │    4    │                        │
+│         └──────────────────────────────┘                        │
+└─────────────────────────────────────────────────────────────────┘
+
+Métricas por Clase:
+┌──────────┬───────────┬────────┬─────────┬─────────────────────┐
+│  Clase   │ Precision │ Recall │ F1-Score│  Support            │
+├──────────┼───────────┼────────┼─────────┼─────────────────────┤
+│  COMPRA  │   51.1%   │  51.1% │  51.1%  │   88                │
+│  VENTA   │   55.6%   │  55.6% │  55.6%  │   90                │
+│  ESPERA  │   18.2%   │  18.2% │  18.2%  │   22                │
+├──────────┼───────────┼────────┼─────────┼─────────────────────┤
+│ Promedio │   51.0%   │  51.0% │  51.0%  │  200                │
+└──────────┴───────────┴────────┴─────────┴─────────────────────┘
+
+Trading Simulado:
+┌─────────────────────────────────────────────────────────────────┐
+│  • Capital inicial: 10,000 USD                                  │
+│  • Operaciones ejecutadas: 178 (excluyendo ESPERA)             │
+│  • Operaciones ganadoras: 95                                    │
+│  • Operaciones perdedoras: 83                                   │
+│  • Win Rate: 53.37%                                             │
+│  • Capital final: 10,705 USD                                    │
+│  • Ganancia: +7.051%                                            │
+│  • Max Drawdown: -3.2%                                          │
+└─────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+9. CONFIGURACIÓN
+═══════════════════════════════════════════════════════════════════════════════
+
+Archivo: config.py
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PARÁMETROS DEL SISTEMA KNN
+# ─────────────────────────────────────────────────────────────────────────────
+
+USAR_KNN = True                        # Activar sistema KNN
+K_VECINOS = 50                         # Número de vecinos a considerar
+HORIZONTE_KNN = 4                      # Velas futuras para etiquetar
+PESO_KNN = 0.6                         # Peso en combinación (60% KNN, 40% LSTM)
+
+# Ajuste fino
+UMBRAL_CAMBIO = 0.0005                 # 0.05% para considerar COMPRA/VENTA
+MIN_DATOS_KNN = 500                    # Mínimo de patrones para entrenar
+
+
+PARÁMETROS CLAVE EXPLICADOS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. K_VECINOS (50)
+   • Cuántos patrones similares considerar
+   • K pequeño (5-10): Más sensible, puede ser ruidoso
+   • K grande (100-200): Más estable, pero promedia demasiado
+   • 50 es un buen balance
+
+2. HORIZONTE_KNN (4)
+   • Cuántas velas hacia adelante mirar
+   • En H4: 4 velas = 16 horas
+   • Horizonte corto (1-2): Señales rápidas pero ruidosas
+   • Horizonte largo (10+): Señales lentas pero confiables
+
+3. PESO_KNN (0.6)
+   • Peso en sistema híbrido LSTM+KNN
+   • 0.6 = 60% KNN, 40% LSTM
+   • KNN tiene más peso porque es más explicable
+
+4. UMBRAL_CAMBIO (0.0005)
+   • 0.05% mínimo para considerar movimiento significativo
+   • Menor: Más señales COMPRA/VENTA, menos ESPERA
+   • Mayor: Más señales ESPERA, solo grandes movimientos
+
+
+═══════════════════════════════════════════════════════════════════════════════
+10. ARCHIVOS DEL SISTEMA
+═══════════════════════════════════════════════════════════════════════════════
+
+SCRIPTS PRINCIPALES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. sistema_knn.py (Clase principal)
+   ├─ Función: Implementación completa del KNN
+   ├─ Clases:
+   │  └─ SistemaRecomendacionKNN
+   │     ├─ preparar_datos_historicos()
+   │     ├─ obtener_recomendacion()
+   │     ├─ evaluar_rendimiento()
+   │     └─ mostrar_patrones_similares()
+   ├─ Líneas de código: 554
+   └─ Uso: Importado por otros módulos
+
+2. entrenar_knn.py
+   ├─ Función: Entrena y evalúa el sistema KNN
+   ├─ Input: datos/eurusd_con_oro.csv
+   ├─ Output: modelos/sistema_knn.pkl
+   ├─ Genera reportes en: registros/
+   ├─ Tiempo: ~2-3 minutos
+   └─ Uso: python entrenar_knn.py
+
+3. prediccion_en_vivo.py (Integrado)
+   ├─ Función: Usa KNN + LSTM en tiempo real
+   ├─ Input: Modelo KNN + Modelo LSTM
+   ├─ Output: Señales combinadas
+   ├─ Combina: 60% KNN + 40% LSTM
+   └─ Uso: python prediccion_en_vivo.py
+
+ARCHIVOS GENERADOS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+modelos/
+└── sistema_knn.pkl               # Sistema KNN completo (~2-5 MB)
+    ├─ Modelo NearestNeighbors
+    ├─ StandardScaler
+    ├─ Etiquetas históricas
+    └─ Configuración
+
+registros/
+├── reporte_entrenamiento_knn_YYYYMMDD_HHMMSS.txt
+│   ├─ Resumen de entrenamiento
+│   ├─ Distribución de patrones
+│   ├─ Accuracy en test set
+│   ├─ Matriz de confusión
+│   └─ Trading simulado
+
+REPORTES GENERADOS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ejemplo: reporte_entrenamiento_knn_20251201_143045.txt
+
+═══════════════════════════════════════════════════════════════════
+🎯 REPORTE DE ENTRENAMIENTO - SISTEMA KNN
+═══════════════════════════════════════════════════════════════════
+
+⏰ Fecha: 2025-12-01 14:30:45
+📊 Datos procesados: 1,726 patrones históricos
+🎯 K vecinos: 50
+⏱️  Horizonte: 4 velas (H4)
+
+─────────────────────────────────────────────────────────────────
+📊 DISTRIBUCIÓN DE PATRONES
+─────────────────────────────────────────────────────────────────
+
+COMPRA: 759 patrones (44.0%) ████████████████
+VENTA: 775 patrones (44.9%) █████████████████
+ESPERA: 192 patrones (11.1%) ████
+
+─────────────────────────────────────────────────────────────────
+✅ RESULTADOS EN TEST SET (200 VELAS)
+─────────────────────────────────────────────────────────────────
+
+Accuracy: 51.00% (102/200 correctas)
+Ganancia simulada: +7.051%
+Win Rate: 53.37%
+
+[... más detalles ...]
+
+
+═══════════════════════════════════════════════════════════════════════════════
+11. COMPARACIÓN CON LSTM
+═══════════════════════════════════════════════════════════════════════════════
+
+LSTM vs KNN - TABLA COMPARATIVA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─────────────────────┬─────────────────────┬──────────────────────┐
+│   Característica    │        LSTM         │         KNN          │
+├─────────────────────┼─────────────────────┼──────────────────────┤
+│ Tipo de IA          │ Deep Learning       │ Machine Learning     │
+│ Complejidad         │ Alta                │ Baja                 │
+│ Explicabilidad      │ ❌ Caja negra       │ ✅ Transparente      │
+│ Tiempo entrenamiento│ 10-15 minutos       │ < 1 segundo          │
+│ Tiempo predicción   │ < 1 segundo         │ ~1 segundo           │
+│ Accuracy típica     │ 65-70%              │ 51%                  │
+│ Datos necesarios    │ 2,000-3,000+        │ 1,500+               │
+│ Captura no lineal   │ ✅ Excelente        │ ⚠️  Limitado         │
+│ Memoria requerida   │ Baja (solo pesos)   │ Alta (todos datos)   │
+│ Patrones complejos  │ ✅ Detecta          │ ❌ No detecta        │
+│ Generalización      │ ✅ Buena            │ ⚠️  Limitada         │
+│ Actualización       │ Reentrenar completo │ Agregar patrones     │
+│ Requiere GPU        │ ⚠️  Recomendado     │ ❌ No                │
+│ Muestra ejemplos    │ ❌ No               │ ✅ Sí (vecinos)      │
+│ Confianza trader    │ ⚠️  Media           │ ✅ Alta              │
+│ Mejor para          │ Predicción pura     │ Explicación          │
+└─────────────────────┴─────────────────────┴──────────────────────┘
+
+
+CUÁNDO USAR CADA UNO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Usar SOLO LSTM cuando:
+   • Tienes muchos datos (>3,000 velas)
+   • Quieres máxima precisión
+   • No necesitas explicar decisiones
+   • Tienes GPU para entrenar
+
+✅ Usar SOLO KNN cuando:
+   • Necesitas explicar cada decisión
+   • Tienes pocos datos (1,500-2,000)
+   • Quieres entrenamiento rápido
+   • El trader necesita confianza en las señales
+
+🔥 Usar AMBOS (Sistema Híbrido):
+   • Combina lo mejor de ambos mundos
+   • LSTM aporta precisión
+   • KNN aporta explicabilidad
+   • Cuando coinciden → Alta confianza
+   • Cuando difieren → ESPERA (evita malas operaciones)
+
+
+SISTEMA HÍBRIDO EN ACCIÓN:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Escenario 1: AMBOS COINCIDEN (CONFIANZA ALTA)
+┌─────────────────────────────────────────────────────────────────┐
+│  LSTM dice: COMPRA (75% confianza)                              │
+│  KNN dice: COMPRA (82% confianza)                               │
+│  → Ambos ven lo mismo desde diferentes ángulos                  │
+│                                                                 │
+│  Señal Final: COMPRA                                            │
+│  Confianza: 0.4×75% + 0.6×82% = 79.2% ✅                        │
+│  Acción: OPERAR con confianza                                   │
+└─────────────────────────────────────────────────────────────────┘
+
+Escenario 2: DIFIEREN (BAJA CONFIANZA)
+┌─────────────────────────────────────────────────────────────────┐
+│  LSTM dice: COMPRA (65% confianza)                              │
+│  KNN dice: VENTA (70% confianza)                                │
+│  → Contradicción = incertidumbre                                │
+│                                                                 │
+│  Señal Final: ESPERA ⚠️                                         │
+│  Confianza: 0%                                                  │
+│  Acción: NO OPERAR (evita operación dudosa)                     │
+└─────────────────────────────────────────────────────────────────┘
+
+Escenario 3: UNO NEUTRAL (CONFIANZA MEDIA)
+┌─────────────────────────────────────────────────────────────────┐
+│  LSTM dice: COMPRA (85% confianza)                              │
+│  KNN dice: ESPERA (45% confianza)                               │
+│  → Solo uno tiene señal clara                                   │
+│                                                                 │
+│  Señal Final: Depende del peso                                  │
+│  Si PESO_KNN alto → ESPERA                                      │
+│  Si PESO_LSTM alto → COMPRA                                     │
+└─────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+✅ RESUMEN EJECUTIVO
+═══════════════════════════════════════════════════════════════════════════════
+
+El Sistema KNN es un ALGORITMO DE RECOMENDACIÓN que:
+
+✓ Busca los 50 patrones históricos MÁS SIMILARES a la situación actual
+✓ Ve qué pasó después en esos 50 casos
+✓ Vota por mayoría: COMPRA / VENTA / ESPERA
+✓ MUESTRA los patrones similares (explicable)
+✓ Se entrena en < 1 segundo
+✓ Accuracy: 51% en test, +7% ganancia simulada
+✓ Se combina con LSTM para mayor precisión
+
+Ventaja Principal: EXPLICABILIDAD
+• Puedes VER por qué recomienda cada acción
+• Genera confianza en el trader
+• Útil para aprender patrones de mercado
+
+Ideal para: Traders que quieren ENTENDER las señales, no solo recibirlas
+
+═══════════════════════════════════════════════════════════════════════════════
+                          FIN DE LA DOCUMENTACIÓN
+═══════════════════════════════════════════════════════════════════════════════

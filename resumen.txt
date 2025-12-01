@@ -1,0 +1,59 @@
+Resumen del Capítulo 2: Filtrado Colaborativo
+Este capítulo introduce los sistemas de recomendación mediante la técnica de filtrado colaborativo, explicando cómo funcionan sitios como Amazon o Last.fm para sugerir productos o música.
+Concepto Principal
+El filtrado colaborativo se basa en encontrar usuarios con gustos similares y recomendar items que esos usuarios similares han valorado positivamente. El proceso tiene dos pasos clave:
+
+Encontrar usuarios similares al usuario objetivo
+Recomendar items que esos usuarios similares disfrutaron pero que el usuario objetivo aún no ha valorado
+
+Medidas de Distancia
+El documento presenta tres métodos principales para calcular similitud entre usuarios:
+1. Distancia de Manhattan
+
+La más simple de calcular
+Suma las diferencias absolutas entre las valoraciones
+Rápida pero puede tener limitaciones con datos dispersos
+
+2. Distancia Euclidiana
+
+Basada en el teorema de Pitágoras
+Calcula la distancia en línea recta entre dos puntos
+Fórmula: √[(x₁-x₂)² + (y₁-y₂)²]
+
+3. Coeficiente de Correlación de Pearson
+
+Útil cuando hay "inflación de calificaciones" (usuarios que califican en escalas diferentes)
+Mide la correlación lineal entre dos variables
+Valores entre -1 (desacuerdo perfecto) y 1 (acuerdo perfecto)
+
+4. Similitud del Coseno
+
+Ideal para datos dispersos (muchos valores cero)
+Ignora coincidencias de ceros compartidos
+Muy utilizada en minería de textos
+
+Problema de Datos Dispersos
+Un desafío importante es cuando los usuarios solo han valorado algunos items en común. El capítulo explica cómo diferentes métricas manejan este problema de manera distinta.
+K-Vecinos Más Cercanos
+En lugar de basarse en un solo usuario similar, este enfoque usa los k usuarios más similares y pondera sus recomendaciones según su nivel de similitud. Esto ayuda a evitar recomendaciones sesgadas por peculiaridades individuales.
+Implementación en Python
+El capítulo proporciona código completo en Python, incluyendo:
+
+Funciones para calcular cada tipo de distancia
+Una clase recommender que integra todas las funcionalidades
+Ejemplos con un dataset real de Book-Crossing con más de 1 millón de valoraciones de libros
+
+Dataset Real
+Se trabaja con el dataset Book-Crossing que contiene:
+
+278,858 usuarios
+271,379 libros
+Más de 1 millón de valoraciones
+
+El capítulo demuestra cómo cargar y usar estos datos para generar recomendaciones reales de libros.
+Conclusión Práctica
+La elección de la métrica de similitud depende de las características de los datos:
+
+Datos densos con magnitud importante: Manhattan o Euclidiana
+Datos con inflación de calificaciones: Pearson
+Datos dispersos: Similitud del Coseno
